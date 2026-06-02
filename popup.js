@@ -294,7 +294,7 @@ async function onCloseDuplicates() {
 // Closes tabs, persists undo payload, and shows undo banner in popup.
 async function closeTabsAndStoreUndo(tabsToClose) {
   const tabsPayload = tabsToClose
-    .filter((tab) => tab.url)
+    .filter((tab) => Number.isInteger(tab.id) && Boolean(tab.url))
     .map((tab) => ({
       id: tab.id,
       title: tab.title || 'Untitled tab',
