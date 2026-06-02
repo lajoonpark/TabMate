@@ -46,7 +46,8 @@ const CATEGORY_RULES = [
   },
 ];
 
-const MAX_VISIBLE_TABS = 8;
+const MAX_VISIBLE_TABS_PER_CATEGORY = 8;
+// Maximum number of tabs allowed for one-click close before requiring confirmation.
 const CONFIRMATION_THRESHOLD = 5;
 
 let allTabs = [];
@@ -134,7 +135,7 @@ function renderCategories(categories) {
       </div>
       <ul class="tab-list">
         ${tabs
-          .slice(0, MAX_VISIBLE_TABS)
+          .slice(0, MAX_VISIBLE_TABS_PER_CATEGORY)
           .map((tab) => {
             const domain = extractDomain(tab.url);
             return `<li class="tab-item">
@@ -145,8 +146,8 @@ function renderCategories(categories) {
           .join('')}
       </ul>
       ${
-        tabs.length > MAX_VISIBLE_TABS
-          ? `<p class="small-muted">+${tabs.length - MAX_VISIBLE_TABS} more tabs</p>`
+        tabs.length > MAX_VISIBLE_TABS_PER_CATEGORY
+          ? `<p class="small-muted">+${tabs.length - MAX_VISIBLE_TABS_PER_CATEGORY} more tabs</p>`
           : ''
       }
       <button class="danger-button" data-category="${escapeHtml(categoryName)}" type="button" ${
