@@ -47,6 +47,7 @@ const CATEGORY_RULES = [
 ];
 
 const MAX_VISIBLE_TABS = 8;
+const CONFIRMATION_THRESHOLD = 5;
 
 let allTabs = [];
 let duplicates = [];
@@ -206,7 +207,7 @@ async function onCloseCategory(categoryName, tabs) {
   if (closableTabs.length === 0) return;
 
   const shouldClose =
-    closableTabs.length <= 5 ||
+    closableTabs.length <= CONFIRMATION_THRESHOLD ||
     window.confirm(`Close ${closableTabs.length} tabs in ${categoryName}?`);
 
   if (!shouldClose) return;
@@ -222,7 +223,7 @@ async function onCloseDuplicates() {
   const tabsToClose = [];
 
   duplicates.forEach((group) => {
-    const keepTab = group.tabs.find((tab) => tab.active) || group.tabs.find((tab) => tab.pinned) || group.tabs[0];
+    const keepTab = selectPreferredTab(group.tabs);
 
     group.tabs.forEach((tab) => {
       if (tab.id !== keepTab.id && isClosableTab(tab)) {
@@ -234,7 +235,8 @@ async function onCloseDuplicates() {
   if (tabsToClose.length === 0) return;
 
   const shouldClose =
-    tabsToClose.length <= 5 || window.confirm(`Close ${tabsToClose.length} duplicate tabs?`);
+    tabsToClose.length <= CONFIRMATION_THRESHOLD ||
+    window.confirm(`Close ${tabsToClose.length} duplicate tabs?`);
 
   if (!shouldClose) return;
 
@@ -290,6 +292,17 @@ async function loadUndoState() {
 // Determines whether a tab can be safely auto-closed.
 function isClosableTab(tab) {
   return Boolean(tab.id) && !tab.pinned && !tab.active;
+}
+
+// Displays the undo banner after a close action.
+function showUndoBanner(count) {
+  undoText.textContent = `Closed ${count} tabs.`;
+  undoBanner.classList.remove('hidden');
+}
+
+// Picks the tab copy that should be kept when closing duplicates.
+function selectPreferredTab(tabs) {
+  return tabs.find((tab) => tab.active) || tabs.find((tab) => tab.pinned) || tabs[0];
 }
 
 // Ensures a hostname matches exactly or by subdomain boundary.
