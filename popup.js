@@ -270,7 +270,9 @@ async function closeTabsAndStoreUndo(tabsToClose) {
 async function onUndo() {
   if (lastClosedTabs.length === 0) return;
 
-  await Promise.all(lastClosedTabs.map((tab) => chrome.tabs.create({ url: tab.url, active: false })));
+  for (const tab of lastClosedTabs) {
+    await chrome.tabs.create({ url: tab.url, active: false });
+  }
 
   await chrome.storage.local.remove(['lastClosedTabs']);
   lastClosedTabs = [];
