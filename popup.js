@@ -1,39 +1,46 @@
 // Domain rule definitions used to bucket tabs into cleanup categories.
 const CATEGORY_RULES = [
-  { name: 'Canva', matcher: ({ hostname }) => hostname.endsWith('canva.com') },
-  { name: 'YouTube', matcher: ({ hostname }) => hostname.endsWith('youtube.com') },
+  { name: 'Canva', matcher: ({ hostname }) => matchesDomain(hostname, 'canva.com') },
+  { name: 'YouTube', matcher: ({ hostname }) => matchesDomain(hostname, 'youtube.com') },
   {
     name: 'Google Docs',
     matcher: ({ hostname }) =>
-      ['docs.google.com', 'sheets.google.com', 'slides.google.com'].includes(hostname),
+      ['docs.google.com', 'sheets.google.com', 'slides.google.com'].some((domain) =>
+        matchesDomain(hostname, domain)
+      ),
   },
   {
     name: 'Coding',
     matcher: ({ hostname }) =>
-      ['github.com', 'vercel.com', 'supabase.com', 'stackoverflow.com'].includes(hostname),
+      ['github.com', 'vercel.com', 'supabase.com', 'stackoverflow.com'].some((domain) =>
+        matchesDomain(hostname, domain)
+      ),
   },
   {
     name: 'AI Tools',
     matcher: ({ hostname }) =>
-      ['chatgpt.com', 'claude.ai', 'gemini.google.com'].includes(hostname),
+      ['chatgpt.com', 'claude.ai', 'gemini.google.com'].some((domain) =>
+        matchesDomain(hostname, domain)
+      ),
   },
   {
     name: 'Shopping',
-    matcher: ({ hostname }) => ['amazon.com', 'trademe.co.nz', 'ebay.com'].includes(hostname),
+    matcher: ({ hostname }) =>
+      ['amazon.com', 'trademe.co.nz', 'ebay.com'].some((domain) => matchesDomain(hostname, domain)),
   },
   {
     name: 'Social',
     matcher: ({ hostname }) =>
-      ['facebook.com', 'instagram.com', 'reddit.com', 'x.com', 'twitter.com', 'tiktok.com'].includes(
-        hostname
+      ['facebook.com', 'instagram.com', 'reddit.com', 'x.com', 'twitter.com', 'tiktok.com'].some(
+        (domain) => matchesDomain(hostname, domain)
       ),
   },
   {
     name: 'Search / Rabbit Holes',
     matcher: ({ hostname, pathname, searchParams }) => {
-      if (hostname.endsWith('google.com') && pathname === '/search') return true;
-      if (hostname.endsWith('bing.com') && pathname === '/search') return true;
-      if (hostname.endsWith('duckduckgo.com') && searchParams.has('q')) return true;
+      if (matchesDomain(hostname, 'google.com') && pathname === '/search') return true;
+      if (matchesDomain(hostname, 'bing.com') && pathname === '/search') return true;
+      if (matchesDomain(hostname, 'duckduckgo.com') && searchParams.has('q')) return true;
       return false;
     },
   },
@@ -245,7 +252,6 @@ async function closeTabsAndStoreUndo(tabsToClose) {
 
   await chrome.storage.local.set({
     lastClosedTabs: payload,
-    closedAt: Date.now(),
   });
 
   await chrome.tabs.remove(tabsToClose.map((tab) => tab.id));
@@ -262,7 +268,7 @@ async function onUndo() {
     await chrome.tabs.create({ url: tab.url, active: false });
   }
 
-  await chrome.storage.local.remove(['lastClosedTabs', 'closedAt']);
+  await chrome.storage.local.remove(['lastClosedTabs']);
   lastClosedTabs = [];
   undoBanner.classList.add('hidden');
 
@@ -284,6 +290,11 @@ async function loadUndoState() {
 // Determines whether a tab can be safely auto-closed.
 function isClosableTab(tab) {
   return Boolean(tab.id) && !tab.pinned && !tab.active;
+}
+
+// Ensures a hostname matches exactly or by subdomain boundary.
+function matchesDomain(hostname, domain) {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
 }
 
 // Converts URL to display-friendly domain string.
