@@ -16,5 +16,8 @@
       "48": "icons/icon48.png"
     },
     "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
   }
 }
