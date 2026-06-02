@@ -152,7 +152,9 @@ function renderCategories(categories) {
       }
       <button class="danger-button" data-category="${escapeHtml(categoryName)}" type="button" ${
         closableCount === 0 ? 'disabled' : ''
-      }>Close all</button>
+      } title="${
+        closableCount === 0 ? 'All tabs here are pinned or currently active' : `Close tabs in ${categoryName}`
+      }">Close all</button>
     `;
 
     card.querySelector('button').addEventListener('click', () => onCloseCategory(categoryName, tabs));
@@ -225,6 +227,7 @@ async function onCloseDuplicates() {
 
   duplicates.forEach((group) => {
     const keepTab = selectPreferredTab(group.tabs);
+    if (!keepTab) return;
 
     group.tabs.forEach((tab) => {
       if (tab.id !== keepTab.id && isClosableTab(tab)) {
@@ -267,9 +270,7 @@ async function closeTabsAndStoreUndo(tabsToClose) {
 async function onUndo() {
   if (lastClosedTabs.length === 0) return;
 
-  for (const tab of lastClosedTabs) {
-    await chrome.tabs.create({ url: tab.url, active: false });
-  }
+  await Promise.all(lastClosedTabs.map((tab) => chrome.tabs.create({ url: tab.url, active: false })));
 
   await chrome.storage.local.remove(['lastClosedTabs']);
   lastClosedTabs = [];
@@ -303,6 +304,7 @@ function showUndoBanner(count) {
 
 // Picks the tab copy that should be kept when closing duplicates.
 function selectPreferredTab(tabs) {
+  if (tabs.length === 0) return null;
   return tabs.find((tab) => tab.active) || tabs.find((tab) => tab.pinned) || tabs[0];
 }
 
