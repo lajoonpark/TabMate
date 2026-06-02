@@ -62,16 +62,51 @@ const undoBanner = document.getElementById('undo-banner');
 const undoText = document.getElementById('undo-text');
 const undoButton = document.getElementById('undo-button');
 
+function callChromeApi(apiCall) {
+  return new Promise((resolve, reject) => {
+    try {
+      apiCall((result) => {
+        const error = chrome.runtime.lastError;
+        if (error) {
+          reject(new Error(error.message));
+          return;
+        }
+
+        resolve(result);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function queryTabs(queryInfo) {
+  return callChromeApi((callback) => chrome.tabs.query(queryInfo, callback));
+}
+
+function sendRuntimeMessage(message) {
+  return callChromeApi((callback) => chrome.runtime.sendMessage(message, callback));
+}
+
+function showActionError(error, fallbackMessage) {
+  console.error(error);
+  window.alert(error instanceof Error && error.message ? error.message : fallbackMessage);
+}
+
 // Entry point for popup rendering and event wiring.
 async function init() {
-  await refreshTabs();
-  closeDuplicatesButton.addEventListener('click', onCloseDuplicates);
-  undoButton.addEventListener('click', onUndo);
+  try {
+    await refreshTabs();
+    closeDuplicatesButton.addEventListener('click', onCloseDuplicates);
+    undoButton.addEventListener('click', onUndo);
+  } catch (error) {
+    showActionError(error, 'Unable to load your tabs.');
+  }
 }
 
 // Queries all tabs (required API shape) and updates the popup sections.
 async function refreshTabs() {
-  allTabs = await chrome.tabs.query({});
+  allTabs = await queryTabs({});
   duplicates = findDuplicateGroups(allTabs);
 
   summaryEl.textContent = `You have ${allTabs.length} open tabs`;
@@ -215,8 +250,12 @@ async function onCloseCategory(categoryName, tabs) {
 
   if (!shouldClose) return;
 
-  await closeTabsAndStoreUndo(closableTabs);
-  await refreshTabs();
+  try {
+    await closeTabsAndStoreUndo(closableTabs);
+    await refreshTabs();
+  } catch (error) {
+    showActionError(error, 'Unable to close those tabs.');
+  }
 }
 
 // Removes duplicate tabs while keeping a single preferred copy for each duplicate URL.
@@ -244,47 +283,66 @@ async function onCloseDuplicates() {
 
   if (!shouldClose) return;
 
-  await closeTabsAndStoreUndo(tabsToClose);
-  await refreshTabs();
+  try {
+    await closeTabsAndStoreUndo(tabsToClose);
+    await refreshTabs();
+  } catch (error) {
+    showActionError(error, 'Unable to close duplicate tabs.');
+  }
 }
 
 // Closes tabs, persists undo payload, and shows undo banner in popup.
 async function closeTabsAndStoreUndo(tabsToClose) {
-  const payload = tabsToClose
-    .filter((tab) => tab.url)
-    .map((tab) => ({ title: tab.title || 'Untitled tab', url: tab.url }));
+  const tabsPayload = tabsToClose
+    .filter((tab) => Number.isInteger(tab.id) && Boolean(tab.url))
+    .map((tab) => ({
+      id: tab.id,
+      title: tab.title || 'Untitled tab',
+      url: tab.url,
+    }));
 
-  if (payload.length === 0) return;
+  if (tabsPayload.length === 0) return;
 
-  await chrome.storage.local.set({
-    lastClosedTabs: payload,
+  const response = await sendRuntimeMessage({
+    type: 'close-tabs',
+    tabs: tabsPayload,
   });
 
-  await chrome.tabs.remove(tabsToClose.map((tab) => tab.id));
+  if (!response?.ok) {
+    throw new Error(response?.error || 'Unable to close tabs.');
+  }
 
-  lastClosedTabs = payload;
-  showUndoBanner(payload.length);
+  lastClosedTabs = Array.isArray(response.lastClosedTabs) ? response.lastClosedTabs : [];
+  showUndoBanner(response.closedCount || lastClosedTabs.length);
 }
 
 // Restores last closed tab batch in the same order using tab create calls.
 async function onUndo() {
   if (lastClosedTabs.length === 0) return;
 
-  for (const tab of lastClosedTabs) {
-    await chrome.tabs.create({ url: tab.url, active: false });
+  try {
+    const response = await sendRuntimeMessage({ type: 'restore-tabs' });
+    if (!response?.ok) {
+      throw new Error(response?.error || 'Unable to restore tabs.');
+    }
+
+    lastClosedTabs = [];
+    undoBanner.classList.add('hidden');
+
+    await refreshTabs();
+  } catch (error) {
+    showActionError(error, 'Unable to restore tabs.');
   }
-
-  await chrome.storage.local.remove(['lastClosedTabs']);
-  lastClosedTabs = [];
-  undoBanner.classList.add('hidden');
-
-  await refreshTabs();
 }
 
 // Loads undo state from extension local storage so undo survives popup reopen.
 async function loadUndoState() {
-  const result = await chrome.storage.local.get(['lastClosedTabs']);
-  lastClosedTabs = Array.isArray(result.lastClosedTabs) ? result.lastClosedTabs : [];
+  const response = await sendRuntimeMessage({ type: 'get-undo-state' });
+  if (!response?.ok) {
+    throw new Error(response?.error || 'Unable to load undo state.');
+  }
+
+  lastClosedTabs = Array.isArray(response.lastClosedTabs) ? response.lastClosedTabs : [];
 
   if (lastClosedTabs.length > 0) {
     showUndoBanner(lastClosedTabs.length);
