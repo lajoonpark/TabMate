@@ -1,3 +1,12 @@
+// Raw URL prefixes/exact matches for browser new-tab and speed dial pages.
+const NEW_TAB_URL_PATTERNS = [
+  'chrome://newtab/',
+  'opera://startpage/',
+  'edge://newtab/',
+  'about:newtab',
+  'about:blank',
+];
+
 // Domain rule definitions used to bucket tabs into cleanup categories.
 const CATEGORY_RULES = [
   { name: 'Canva', matcher: ({ hostname }) => matchesDomain(hostname, 'canva.com') },
@@ -43,6 +52,51 @@ const CATEGORY_RULES = [
       if (matchesDomain(hostname, 'duckduckgo.com') && searchParams.has('q')) return true;
       return false;
     },
+  },
+  {
+    name: 'Work / School',
+    matcher: ({ hostname }) =>
+      [
+        'teams.microsoft.com',
+        'office.com',
+        'outlook.office.com',
+        'sharepoint.com',
+        'onedrive.live.com',
+        'mail.google.com',
+        'calendar.google.com',
+        'meet.google.com',
+        'zoom.us',
+        'notion.so',
+        'slack.com',
+      ].some((domain) => matchesDomain(hostname, domain)),
+  },
+  {
+    name: 'Entertainment & Streaming',
+    matcher: ({ hostname }) =>
+      [
+        'netflix.com',
+        'disneyplus.com',
+        'hulu.com',
+        'primevideo.com',
+        'twitch.tv',
+        'spotify.com',
+        'soundcloud.com',
+        'crunchyroll.com',
+      ].some((domain) => matchesDomain(hostname, domain)),
+  },
+  {
+    name: 'News & Reading',
+    matcher: ({ hostname }) =>
+      [
+        'bbc.com',
+        'bbc.co.uk',
+        'cnn.com',
+        'nytimes.com',
+        'theguardian.com',
+        'medium.com',
+        'substack.com',
+        'wikipedia.org',
+      ].some((domain) => matchesDomain(hostname, domain)),
   },
 ];
 
@@ -118,10 +172,15 @@ async function refreshTabs() {
 
 // Categorizes each tab by URL hostname/path matching rules, with Other fallback.
 function categorizeTabs(tabs) {
-  const categories = new Map(CATEGORY_RULES.map((rule) => [rule.name, []]));
+  const categories = new Map([['New Tabs', []], ...CATEGORY_RULES.map((rule) => [rule.name, []])]);
   categories.set('Other', []);
 
   tabs.forEach((tab) => {
+    if (isNewTab(tab.url)) {
+      categories.get('New Tabs').push(tab);
+      return;
+    }
+
     const parsed = parseTabUrl(tab.url);
     if (!parsed) {
       categories.get('Other').push(tab);
@@ -134,6 +193,12 @@ function categorizeTabs(tabs) {
   });
 
   return categories;
+}
+
+// Returns true if the raw URL is a known browser new-tab or speed dial page.
+function isNewTab(url) {
+  if (!url) return false;
+  return NEW_TAB_URL_PATTERNS.some((pattern) => url === pattern || url.startsWith(pattern));
 }
 
 // Safely parses tab URLs and ignores non-http(s) URLs.
