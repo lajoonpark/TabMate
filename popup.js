@@ -48,7 +48,8 @@ async function refreshTabs() {
   confirmationThreshold = settings.confirmationThreshold;
 
   allTabs = await chrome.tabs.query({});
-  duplicates = findDuplicateGroups(allTabs, settings.duplicateDetection);
+  const { enabled: dedupeEnabled = true, ignoreHash, ignoreQuery } = settings.duplicateDetection;
+  duplicates = dedupeEnabled ? findDuplicateGroups(allTabs, { ignoreHash, ignoreQuery }) : [];
 
   summaryEl.textContent = `You have ${allTabs.length} open tabs`;
 
