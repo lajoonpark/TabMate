@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TabMate — Settings</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <div class="settings-layout">
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar__brand">
+          <img src="icons/icon48.png" alt="TabMate logo" class="sidebar__logo" />
+          <span class="sidebar__name">TabMate</span>
+        </div>
+        <nav class="sidebar__nav" aria-label="Settings sections">
+          <button class="sidebar__nav-item active" data-section="categories" type="button">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+            </svg>
+            Categories
+          </button>
+        </nav>
+      </aside>
+
+      <!-- Main content -->
+      <main class="settings-main">
+
+        <!-- ── Categories section ─────────────────────────────────── -->
+        <section id="section-categories" class="settings-section">
+          <div class="section-header">
+            <div>
+              <h1 class="section-header__title">Categories</h1>
+              <p class="section-header__sub">
+                Drag to reorder. Tabs are matched from top to bottom — the first matching category wins.
+              </p>
+            </div>
+            <button id="btn-add-category" class="btn-primary" type="button">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+              </svg>
+              Add Category
+            </button>
+          </div>
+
+          <!-- Editor panel (hidden until editing) -->
+          <div id="category-editor" class="category-editor hidden" role="dialog" aria-label="Edit category" aria-modal="true">
+            <h2 id="editor-title" class="category-editor__title">New Category</h2>
+
+            <div class="editor-field">
+              <label class="editor-label" for="editor-name">Name</label>
+              <input
+                id="editor-name"
+                class="editor-input"
+                type="text"
+                placeholder="e.g. Finance"
+                maxlength="40"
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="editor-field">
+              <span class="editor-label">Colour</span>
+              <div id="colour-picker" class="colour-picker" role="radiogroup" aria-label="Category colour">
+                <!-- Rendered by settings.js -->
+              </div>
+            </div>
+
+            <div class="editor-field">
+              <div class="rules-header">
+                <span class="editor-label">Matching Rules</span>
+                <button id="btn-add-rule" class="btn-link" type="button">+ Add rule</button>
+              </div>
+              <p class="editor-hint">
+                Tabs are matched against rules in order. A tab matches if <em>any</em> rule passes.
+              </p>
+              <div id="rules-list" class="rules-list" aria-label="Matching rules">
+                <!-- Rendered by settings.js -->
+              </div>
+              <p id="rules-empty" class="rules-empty hidden">No rules yet — this category won't match any tabs automatically.</p>
+            </div>
+
+            <div class="editor-actions">
+              <button id="btn-save-category" class="btn-primary" type="button">Save</button>
+              <button id="btn-cancel-editor" class="btn-secondary" type="button">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Category list -->
+          <div id="category-list" class="category-list" aria-label="Categories">
+            <!-- Rendered by settings.js -->
+          </div>
+
+          <!-- Preview / test area -->
+          <div class="preview-card">
+            <h2 class="preview-card__title">Test a URL or title</h2>
+            <p class="preview-card__sub">Paste a URL or title to see which category it would match.</p>
+            <div class="preview-inputs">
+              <input
+                id="preview-url"
+                class="editor-input"
+                type="url"
+                placeholder="https://example.com"
+                autocomplete="off"
+              />
+              <input
+                id="preview-title"
+                class="editor-input"
+                type="text"
+                placeholder="Page title (optional)"
+                autocomplete="off"
+              />
+              <button id="btn-preview" class="btn-primary" type="button">Test</button>
+            </div>
+            <div id="preview-result" class="preview-result hidden" aria-live="polite">
+              Matches:
+              <span id="preview-dot" class="preview-dot"></span>
+              <strong id="preview-match"></strong>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <script type="module" src="settings.js"></script>
+  </body>
+</html>
