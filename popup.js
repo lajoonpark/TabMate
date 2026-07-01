@@ -150,12 +150,12 @@ async function refreshTabs() {
 // ─── 1. Organise Tabs ─────────────────────────────────────────────────────────
 
 /** Colour palette for tab groups, cycled by category index. */
-const GROUP_COLORS = ['blue', 'cyan', 'green', 'yellow', 'orange', 'pink', 'purple', 'grey'];
+const GROUP_COLORS = ['blue', 'cyan', 'green', 'yellow', 'orange', 'pink', 'purple', 'gray'];
 
 async function onOrganiseTabs() {
   if (!chrome.tabGroups) {
     window.alert(
-      'Tab Islands / Groups are not supported in this browser.\n\n' +
+      'Tab Groups are not supported in this browser.\n\n' +
         'This feature requires Chrome 89+ or Edge 89+.',
     );
     return;
@@ -370,15 +370,18 @@ async function onSaveCurrentTab() {
       return;
     }
 
+    // savedAt is stored as a Unix timestamp in milliseconds.
     target.tabs.push({ title: activeTab.title || 'Untitled', url: activeTab.url, savedAt: Date.now() });
     await setBoards(boards);
 
     // Brief visual feedback on the tile itself
     const btn = document.getElementById('btn-save');
-    const originalSub = btn.querySelector('.tile__sub');
-    const originalText = originalSub.textContent;
-    originalSub.textContent = `Saved to ${target.name}!`;
-    setTimeout(() => { originalSub.textContent = originalText; }, 2000);
+    const originalSub = btn ? btn.querySelector('.tile__sub') : null;
+    if (originalSub) {
+      const originalText = originalSub.textContent;
+      originalSub.textContent = `Saved to ${target.name}!`;
+      setTimeout(() => { originalSub.textContent = originalText; }, 2000);
+    }
   } catch (error) {
     showActionError(error, 'Unable to save the current tab.');
   }
