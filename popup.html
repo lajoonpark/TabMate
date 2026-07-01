@@ -8,32 +8,124 @@
   </head>
   <body>
     <main class="popup">
+
+      <!-- Header -->
       <header class="popup__header">
-        <div>
-          <h1>TabMate</h1>
-          <p id="summary" class="summary">Loading tabs…</p>
+        <div class="popup__brand">
+          <h1 class="popup__title">TabMate</h1>
+          <p id="summary" class="popup__summary">Loading tabs…</p>
         </div>
+        <button id="btn-open-settings" class="icon-btn" type="button" title="Open Website / Settings" aria-label="Open Website / Settings">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+        </button>
       </header>
 
-      <section id="undo-banner" class="undo-banner hidden" aria-live="polite" role="status">
-        <span id="undo-text"></span>
-        <button id="undo-button" class="link-button" type="button">Undo</button>
+      <!-- Undo banner -->
+      <div id="undo-banner" class="undo-banner hidden" aria-live="polite" role="status">
+        <span id="undo-text" class="undo-banner__text"></span>
+        <button id="undo-button" class="undo-banner__btn" type="button">Undo</button>
+      </div>
+
+      <!-- Action tiles -->
+      <section class="tiles" aria-label="Actions">
+        <button id="btn-organise" class="tile tile--blue" type="button">
+          <svg class="tile__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"/></svg>
+          <span class="tile__label">Organise Tabs</span>
+          <span class="tile__sub">Tab Islands / Groups</span>
+        </button>
+
+        <button id="btn-close-cat" class="tile tile--blue" type="button" aria-expanded="false" aria-controls="panel-categories">
+          <svg class="tile__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+          <span class="tile__label">Close by Category</span>
+          <span class="tile__sub">Select a group to close</span>
+        </button>
+
+        <button id="btn-duplicates" class="tile tile--danger" type="button" aria-expanded="false" aria-controls="panel-duplicates">
+          <svg class="tile__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+          <span class="tile__label">Delete Duplicates</span>
+          <span id="dup-badge" class="tile__badge hidden">0</span>
+          <span class="tile__sub" id="dup-sub">Checking…</span>
+        </button>
+
+        <button id="btn-preset" class="tile tile--teal" type="button" aria-expanded="false" aria-controls="panel-presets">
+          <svg class="tile__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
+          <span class="tile__label">Open Preset</span>
+          <span class="tile__sub">Open a saved board</span>
+        </button>
+
+        <button id="btn-save" class="tile tile--teal" type="button">
+          <svg class="tile__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z" clip-rule="evenodd"/></svg>
+          <span class="tile__label">Save Current Tab</span>
+          <span class="tile__sub">Save to default board</span>
+        </button>
+
+        <button id="btn-shortcuts" class="tile tile--dark" type="button" aria-expanded="false" aria-controls="panel-shortcuts">
+          <svg class="tile__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+          <span class="tile__label">Keyboard Shortcuts</span>
+          <span class="tile__sub">View configured shortcuts</span>
+        </button>
       </section>
 
-      <section class="section">
-        <div class="section__title-row">
-          <h2>Categories</h2>
+      <!-- Sub-panels (one shown at a time) -->
+      <section id="panel-categories" class="sub-panel hidden" aria-label="Close by Category">
+        <div class="sub-panel__header">
+          <h2 class="sub-panel__title">Close by Category</h2>
+          <button class="sub-panel__close" data-panel="panel-categories" type="button" aria-label="Close panel">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </button>
         </div>
-        <div id="categories" class="cards"></div>
+        <div id="category-rows" class="category-rows"></div>
       </section>
 
-      <section class="section">
-        <div class="section__title-row">
-          <h2>Duplicate URLs</h2>
-          <button id="close-duplicates" class="danger-button" type="button">Close duplicates</button>
+      <section id="panel-duplicates" class="sub-panel hidden" aria-label="Delete Duplicate Tabs">
+        <div class="sub-panel__header">
+          <h2 class="sub-panel__title">Duplicate Tabs</h2>
+          <button class="sub-panel__close" data-panel="panel-duplicates" type="button" aria-label="Close panel">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </button>
         </div>
-        <div id="duplicates" class="duplicates"></div>
+        <div id="duplicate-detail" class="duplicate-detail"></div>
       </section>
+
+      <section id="panel-presets" class="sub-panel hidden" aria-label="Open Preset">
+        <div class="sub-panel__header">
+          <h2 class="sub-panel__title">Open Preset</h2>
+          <button class="sub-panel__close" data-panel="panel-presets" type="button" aria-label="Close panel">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+        <div id="preset-rows" class="preset-rows"></div>
+      </section>
+
+      <section id="panel-shortcuts" class="sub-panel hidden" aria-label="Keyboard Shortcuts">
+        <div class="sub-panel__header">
+          <h2 class="sub-panel__title">Keyboard Shortcuts</h2>
+          <button class="sub-panel__close" data-panel="panel-shortcuts" type="button" aria-label="Close panel">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+        <div id="shortcut-rows" class="shortcut-rows"></div>
+      </section>
+
+      <!-- Pop-ups toggle -->
+      <div class="toggle-row">
+        <label class="toggle-row__label" for="toggle-popups">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+          Pop-up notifications
+        </label>
+        <button id="toggle-popups" class="toggle" role="switch" aria-checked="true" type="button" aria-label="Toggle pop-up notifications">
+          <span class="toggle__thumb"></span>
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <footer class="popup__footer">
+        <button id="btn-footer-settings" class="footer-link" type="button">
+          Open TabMate Website / Settings
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </button>
+      </footer>
+
     </main>
 
     <script type="module" src="popup.js"></script>
