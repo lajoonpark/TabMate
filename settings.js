@@ -199,9 +199,12 @@ function renderCategoryList() {
 
   categories.forEach((cat, index) => {
     const isFirst = index === 0;
-    // "Other" is always last and cannot be moved past the second-to-last
-    const isLast  = index === categories.length - 1;
     const isOther = cat.id === 'other';
+    // A non-Other category cannot move down past the second-to-last slot when
+    // "Other" is pinned at the end.
+    const otherIsLast = categories[categories.length - 1]?.id === 'other';
+    const canMoveDown = !isOther && index < categories.length - 1 && !(otherIsLast && index === categories.length - 2);
+    const canMoveUp   = !isFirst && !isOther;
 
     const item = document.createElement('div');
     item.className = 'cat-item';
@@ -216,7 +219,7 @@ function renderCategoryList() {
           class="reorder-btn"
           type="button"
           aria-label="Move ${escapeHtml(cat.name)} up"
-          ${isFirst || (isOther && categories.length > 1) ? 'disabled' : ''}
+          ${canMoveUp ? '' : 'disabled'}
           data-action="up"
           data-id="${escapeHtml(cat.id)}"
         >
@@ -228,7 +231,7 @@ function renderCategoryList() {
           class="reorder-btn"
           type="button"
           aria-label="Move ${escapeHtml(cat.name)} down"
-          ${isLast || (isOther) ? 'disabled' : (index === categories.length - 2 && categories[categories.length - 1]?.id === 'other') ? 'disabled' : ''}
+          ${canMoveDown ? '' : 'disabled'}
           data-action="down"
           data-id="${escapeHtml(cat.id)}"
         >
