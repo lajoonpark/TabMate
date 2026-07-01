@@ -1,42 +1,11 @@
-function callChromeApi(apiCall) {
-  return new Promise((resolve, reject) => {
-    try {
-      apiCall((result) => {
-        const error = chrome.runtime.lastError;
-        if (error) {
-          reject(new Error(error.message));
-          return;
-        }
+import { initDefaults, getUndoTabs, setUndoTabs, clearUndoTabs } from './lib/storage.js';
 
-        resolve(result);
-      });
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
-
-function getStoredUndoTabs() {
-  return callChromeApi((callback) => chrome.storage.local.get(['lastClosedTabs'], callback)).then(
-    (result) => (Array.isArray(result.lastClosedTabs) ? result.lastClosedTabs : [])
-  );
-}
-
-function setStoredUndoTabs(tabs) {
-  return callChromeApi((callback) => chrome.storage.local.set({ lastClosedTabs: tabs }, callback));
-}
-
-function clearStoredUndoTabs() {
-  return callChromeApi((callback) => chrome.storage.local.remove(['lastClosedTabs'], callback));
-}
-
-function removeTabs(tabIds) {
-  return callChromeApi((callback) => chrome.tabs.remove(tabIds, callback));
-}
-
-function createTab(url) {
-  return callChromeApi((callback) => chrome.tabs.create({ url, active: false }, callback));
-}
+// Seed default categories, boards, and settings on install or update.
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === 'install' || reason === 'update') {
+    initDefaults().catch(console.error);
+  }
+});
 
 async function handleCloseTabs(message) {
   const tabsToClose = Array.isArray(message.tabs)
@@ -52,8 +21,8 @@ async function handleCloseTabs(message) {
     url: tab.url,
   }));
 
-  await setStoredUndoTabs(payload);
-  await removeTabs(tabsToClose.map((tab) => tab.id));
+  await setUndoTabs(payload);
+  await chrome.tabs.remove(tabsToClose.map((tab) => tab.id));
 
   return {
     ok: true,
@@ -63,19 +32,14 @@ async function handleCloseTabs(message) {
 }
 
 async function handleRestoreTabs() {
-  const lastClosedTabs = await getStoredUndoTabs();
+  const lastClosedTabs = await getUndoTabs();
 
   for (const tab of lastClosedTabs) {
-    await createTab(tab.url);
+    await chrome.tabs.create({ url: tab.url, active: false });
   }
 
-  await clearStoredUndoTabs();
+  await clearUndoTabs();
   return { ok: true, restoredCount: lastClosedTabs.length, lastClosedTabs: [] };
-}
-
-async function handleGetUndoState() {
-  const lastClosedTabs = await getStoredUndoTabs();
-  return { ok: true, lastClosedTabs };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -84,9 +48,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       ? handleCloseTabs(message)
       : message?.type === 'restore-tabs'
         ? handleRestoreTabs()
-        : message?.type === 'get-undo-state'
-          ? handleGetUndoState()
-          : Promise.resolve({ ok: false, error: 'Unknown message type.' });
+        : Promise.resolve({ ok: false, error: 'Unknown message type.' });
 
   action
     .then((response) => sendResponse(response))

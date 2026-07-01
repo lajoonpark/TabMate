@@ -1,112 +1,18 @@
-// Raw URL prefixes/exact matches for browser new-tab and speed dial pages.
-const NEW_TAB_URL_PATTERNS = [
-  'chrome://newtab/',
-  'opera://startpage/',
-  'edge://newtab/',
-  'about:newtab',
-  'about:blank',
-];
-
-// Domain rule definitions used to bucket tabs into cleanup categories.
-const CATEGORY_RULES = [
-  { name: 'Canva', matcher: ({ hostname }) => matchesDomain(hostname, 'canva.com') },
-  { name: 'YouTube', matcher: ({ hostname }) => matchesDomain(hostname, 'youtube.com') },
-  {
-    name: 'Google Docs',
-    matcher: ({ hostname }) =>
-      ['docs.google.com', 'sheets.google.com', 'slides.google.com'].some((domain) =>
-        matchesDomain(hostname, domain)
-      ),
-  },
-  {
-    name: 'Coding',
-    matcher: ({ hostname }) =>
-      ['github.com', 'vercel.com', 'supabase.com', 'stackoverflow.com'].some((domain) =>
-        matchesDomain(hostname, domain)
-      ),
-  },
-  {
-    name: 'AI Tools',
-    matcher: ({ hostname }) =>
-      ['chatgpt.com', 'claude.ai', 'gemini.google.com'].some((domain) =>
-        matchesDomain(hostname, domain)
-      ),
-  },
-  {
-    name: 'Shopping',
-    matcher: ({ hostname }) =>
-      ['amazon.com', 'trademe.co.nz', 'ebay.com'].some((domain) => matchesDomain(hostname, domain)),
-  },
-  {
-    name: 'Social',
-    matcher: ({ hostname }) =>
-      ['facebook.com', 'instagram.com', 'reddit.com', 'x.com', 'twitter.com', 'tiktok.com'].some(
-        (domain) => matchesDomain(hostname, domain)
-      ),
-  },
-  {
-    name: 'Search / Rabbit Holes',
-    matcher: ({ hostname, pathname, searchParams }) => {
-      if (matchesDomain(hostname, 'google.com') && pathname === '/search') return true;
-      if (matchesDomain(hostname, 'bing.com') && pathname === '/search') return true;
-      if (matchesDomain(hostname, 'duckduckgo.com') && searchParams.has('q')) return true;
-      return false;
-    },
-  },
-  {
-    name: 'Work / School',
-    matcher: ({ hostname }) =>
-      [
-        'teams.microsoft.com',
-        'office.com',
-        'outlook.office.com',
-        'sharepoint.com',
-        'onedrive.live.com',
-        'mail.google.com',
-        'calendar.google.com',
-        'meet.google.com',
-        'zoom.us',
-        'notion.so',
-        'slack.com',
-      ].some((domain) => matchesDomain(hostname, domain)),
-  },
-  {
-    name: 'Entertainment & Streaming',
-    matcher: ({ hostname }) =>
-      [
-        'netflix.com',
-        'disneyplus.com',
-        'hulu.com',
-        'primevideo.com',
-        'twitch.tv',
-        'spotify.com',
-        'soundcloud.com',
-        'crunchyroll.com',
-      ].some((domain) => matchesDomain(hostname, domain)),
-  },
-  {
-    name: 'News & Reading',
-    matcher: ({ hostname }) =>
-      [
-        'bbc.com',
-        'bbc.co.uk',
-        'cnn.com',
-        'nytimes.com',
-        'theguardian.com',
-        'medium.com',
-        'substack.com',
-        'wikipedia.org',
-      ].some((domain) => matchesDomain(hostname, domain)),
-  },
-];
-
-const MAX_VISIBLE_TABS_PER_CATEGORY = 8;
-// Maximum number of tabs allowed for one-click close before requiring confirmation.
-const CONFIRMATION_THRESHOLD = 5;
+import {
+  MAX_VISIBLE_TABS_PER_CATEGORY,
+  categorizeTabs,
+  findDuplicateGroups,
+  isClosableTab,
+  selectPreferredTab,
+  extractDomain,
+  escapeHtml,
+} from './lib/utils.js';
+import { getUndoTabs, getSettings } from './lib/storage.js';
 
 let allTabs = [];
 let duplicates = [];
 let lastClosedTabs = [];
+let confirmationThreshold = 5;
 
 const summaryEl = document.getElementById('summary');
 const categoriesEl = document.getElementById('categories');
@@ -116,30 +22,8 @@ const undoBanner = document.getElementById('undo-banner');
 const undoText = document.getElementById('undo-text');
 const undoButton = document.getElementById('undo-button');
 
-function callChromeApi(apiCall) {
-  return new Promise((resolve, reject) => {
-    try {
-      apiCall((result) => {
-        const error = chrome.runtime.lastError;
-        if (error) {
-          reject(new Error(error.message));
-          return;
-        }
-
-        resolve(result);
-      });
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
-
-function queryTabs(queryInfo) {
-  return callChromeApi((callback) => chrome.tabs.query(queryInfo, callback));
-}
-
 function sendRuntimeMessage(message) {
-  return callChromeApi((callback) => chrome.runtime.sendMessage(message, callback));
+  return chrome.runtime.sendMessage(message);
 }
 
 function showActionError(error, fallbackMessage) {
@@ -158,63 +42,20 @@ async function init() {
   }
 }
 
-// Queries all tabs (required API shape) and updates the popup sections.
+// Queries all tabs and updates the popup sections, reading settings first.
 async function refreshTabs() {
-  allTabs = await queryTabs({});
-  duplicates = findDuplicateGroups(allTabs);
+  const settings = await getSettings();
+  confirmationThreshold = settings.confirmationThreshold;
+
+  allTabs = await chrome.tabs.query({});
+  const { enabled: dedupeEnabled = true, ignoreHash, ignoreQuery } = settings.duplicateDetection;
+  duplicates = dedupeEnabled ? findDuplicateGroups(allTabs, { ignoreHash, ignoreQuery }) : [];
 
   summaryEl.textContent = `You have ${allTabs.length} open tabs`;
 
   renderCategories(categorizeTabs(allTabs));
   renderDuplicates(duplicates);
   await loadUndoState();
-}
-
-// Categorizes each tab by URL hostname/path matching rules, with Other fallback.
-function categorizeTabs(tabs) {
-  const categories = new Map([['New Tabs', []], ...CATEGORY_RULES.map((rule) => [rule.name, []])]);
-  categories.set('Other', []);
-
-  tabs.forEach((tab) => {
-    if (isNewTab(tab.url)) {
-      categories.get('New Tabs').push(tab);
-      return;
-    }
-
-    const parsed = parseTabUrl(tab.url);
-    if (!parsed) {
-      categories.get('Other').push(tab);
-      return;
-    }
-
-    const matchedRule = CATEGORY_RULES.find((rule) => rule.matcher(parsed));
-    const categoryName = matchedRule ? matchedRule.name : 'Other';
-    categories.get(categoryName).push(tab);
-  });
-
-  return categories;
-}
-
-// Returns true if the raw URL is a known browser new-tab or speed dial page.
-function isNewTab(url) {
-  if (!url) return false;
-  return NEW_TAB_URL_PATTERNS.some((pattern) => url === pattern || url.startsWith(pattern));
-}
-
-// Safely parses tab URLs and ignores non-http(s) URLs.
-function parseTabUrl(url) {
-  try {
-    const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-
-    return {
-      hostname: parsed.hostname.replace(/^www\./, ''),
-      pathname: parsed.pathname,
-      searchParams: parsed.searchParams,
-    };
-  } catch {
-    return null;
-  }
 }
 
 // Creates card UI for each category with tab details and close action.
@@ -284,33 +125,13 @@ function renderDuplicates(groups) {
   closeDuplicatesButton.disabled = false;
 }
 
-// Finds duplicate tab groups by URL.
-function findDuplicateGroups(tabs) {
-  const groups = new Map();
-
-  tabs.forEach((tab) => {
-    if (!tab.url || !tab.id) return;
-    const parsed = parseTabUrl(tab.url);
-    if (!parsed) return;
-
-    if (!groups.has(tab.url)) {
-      groups.set(tab.url, []);
-    }
-    groups.get(tab.url).push(tab);
-  });
-
-  return [...groups.entries()]
-    .filter(([, groupedTabs]) => groupedTabs.length > 1)
-    .map(([url, groupedTabs]) => ({ url, tabs: groupedTabs }));
-}
-
 // Handles close-by-category while preserving pinned and active tabs.
 async function onCloseCategory(categoryName, tabs) {
   const closableTabs = tabs.filter(isClosableTab);
   if (closableTabs.length === 0) return;
 
   const shouldClose =
-    closableTabs.length <= CONFIRMATION_THRESHOLD ||
+    closableTabs.length <= confirmationThreshold ||
     window.confirm(`Close ${closableTabs.length} tabs in ${categoryName}?`);
 
   if (!shouldClose) return;
@@ -323,7 +144,7 @@ async function onCloseCategory(categoryName, tabs) {
   }
 }
 
-// Removes duplicate tabs while keeping a single preferred copy for each duplicate URL.
+// Removes duplicate tabs while keeping a single preferred copy for each URL.
 async function onCloseDuplicates() {
   if (duplicates.length === 0) return;
 
@@ -343,7 +164,7 @@ async function onCloseDuplicates() {
   if (tabsToClose.length === 0) return;
 
   const shouldClose =
-    tabsToClose.length <= CONFIRMATION_THRESHOLD ||
+    tabsToClose.length <= confirmationThreshold ||
     window.confirm(`Close ${tabsToClose.length} duplicate tabs?`);
 
   if (!shouldClose) return;
@@ -356,7 +177,7 @@ async function onCloseDuplicates() {
   }
 }
 
-// Closes tabs, persists undo payload, and shows undo banner in popup.
+// Closes tabs via the background service worker and shows undo banner.
 async function closeTabsAndStoreUndo(tabsToClose) {
   const tabsPayload = tabsToClose
     .filter((tab) => Number.isInteger(tab.id) && Boolean(tab.url))
@@ -381,7 +202,7 @@ async function closeTabsAndStoreUndo(tabsToClose) {
   showUndoBanner(response.closedCount || lastClosedTabs.length);
 }
 
-// Restores last closed tab batch in the same order using tab create calls.
+// Restores last closed tab batch via the background service worker.
 async function onUndo() {
   if (lastClosedTabs.length === 0) return;
 
@@ -400,14 +221,9 @@ async function onUndo() {
   }
 }
 
-// Loads undo state from extension local storage so undo survives popup reopen.
+// Loads undo state from extension storage so undo survives popup reopen.
 async function loadUndoState() {
-  const response = await sendRuntimeMessage({ type: 'get-undo-state' });
-  if (!response?.ok) {
-    throw new Error(response?.error || 'Unable to load undo state.');
-  }
-
-  lastClosedTabs = Array.isArray(response.lastClosedTabs) ? response.lastClosedTabs : [];
+  lastClosedTabs = await getUndoTabs();
 
   if (lastClosedTabs.length > 0) {
     showUndoBanner(lastClosedTabs.length);
@@ -416,42 +232,10 @@ async function loadUndoState() {
   }
 }
 
-// Determines whether a tab can be safely auto-closed.
-function isClosableTab(tab) {
-  return Boolean(tab.id) && !tab.pinned && !tab.active;
-}
-
 // Displays the undo banner after a close action.
 function showUndoBanner(count) {
   undoText.textContent = `Closed ${count} tabs.`;
   undoBanner.classList.remove('hidden');
-}
-
-// Picks the tab copy that should be kept when closing duplicates.
-function selectPreferredTab(tabs) {
-  if (tabs.length === 0) return null;
-  return tabs.find((tab) => tab.active) || tabs.find((tab) => tab.pinned) || tabs[0];
-}
-
-// Ensures a hostname matches exactly or by subdomain boundary.
-function matchesDomain(hostname, domain) {
-  return hostname === domain || hostname.endsWith(`.${domain}`);
-}
-
-// Converts URL to display-friendly domain string.
-function extractDomain(url) {
-  const parsed = parseTabUrl(url);
-  return parsed ? parsed.hostname : 'Non-web tab';
-}
-
-// Escapes dynamic text to keep popup rendering safe.
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
 
 init();
