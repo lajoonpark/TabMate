@@ -1,7 +1,8 @@
 import {
-  categorizeTabs,
+  categorizeTabsWithCategories,
   findDuplicateGroups,
   isClosableTab,
+  isInternalUrl,
   selectPreferredTab,
   escapeHtml,
 } from './lib/utils.js';
@@ -11,6 +12,7 @@ import {
   setSettings,
   getBoards,
   setBoards,
+  getCategories,
 } from './lib/storage.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -19,6 +21,7 @@ let allTabs = [];
 let duplicateGroups = [];
 let lastClosedTabs = [];
 let confirmationThreshold = 5;
+let userCategories = [];
 
 /** Currently open sub-panel id, or null. */
 let activePanel = null;
@@ -123,7 +126,11 @@ async function refreshTabs() {
   const settings = await getSettings();
   confirmationThreshold = settings.confirmationThreshold;
 
-  allTabs = await chrome.tabs.query({});
+  [allTabs, userCategories] = await Promise.all([
+    chrome.tabs.query({}),
+    getCategories(),
+  ]);
+
   const { enabled: dedupeEnabled = true, ignoreHash, ignoreQuery } = settings.duplicateDetection;
   duplicateGroups = dedupeEnabled ? findDuplicateGroups(allTabs, { ignoreHash, ignoreQuery }) : [];
 
@@ -143,14 +150,10 @@ async function refreshTabs() {
   // Re-render any open panel's content
   if (activePanel === 'panel-categories') renderCategoryRows();
   if (activePanel === 'panel-duplicates') renderDuplicateDetail();
-
   await loadUndoState();
 }
 
 // ─── 1. Organise Tabs ─────────────────────────────────────────────────────────
-
-/** Colour palette for tab groups, cycled by category index. */
-const GROUP_COLORS = ['blue', 'cyan', 'green', 'yellow', 'orange', 'pink', 'purple', 'gray'];
 
 async function onOrganiseTabs() {
   if (!chrome.tabGroups) {
@@ -163,21 +166,38 @@ async function onOrganiseTabs() {
 
   try {
     const tabs = await chrome.tabs.query({ currentWindow: true });
-    const categories = categorizeTabs(tabs);
-    let colorIdx = 0;
+
+    // Build a map from category name → { colour, tabIds }
+    const categories = categorizeTabsWithCategories(tabs, userCategories);
+    const colourMap = new Map(userCategories.map((c) => [c.name, c.colour]));
+    const fallbackColours = ['blue', 'cyan', 'green', 'yellow', 'orange', 'pink', 'purple', 'grey'];
+    let colourIdx = 0;
 
     for (const [name, catTabs] of categories) {
       if (catTabs.length === 0) continue;
-      const tabIds = catTabs.map((t) => t.id).filter(Number.isInteger);
-      if (tabIds.length === 0) continue;
 
-      const groupId = await chrome.tabs.group({ tabIds });
-      await chrome.tabGroups.update(groupId, {
-        title: name,
-        color: GROUP_COLORS[colorIdx % GROUP_COLORS.length],
-        collapsed: false,
-      });
-      colorIdx++;
+      // Skip pinned tabs and internal browser pages — they cannot be grouped.
+      const groupableTabs = catTabs.filter(
+        (t) => !t.pinned && Number.isInteger(t.id) && !isInternalUrl(t.url),
+      );
+      if (groupableTabs.length === 0) continue;
+
+      const tabIds = groupableTabs.map((t) => t.id);
+      const colour = colourMap.get(name) ?? fallbackColours[colourIdx % fallbackColours.length];
+
+      try {
+        const groupId = await chrome.tabs.group({ tabIds });
+        await chrome.tabGroups.update(groupId, {
+          title: name,
+          color: colour,
+          collapsed: false,
+        });
+      } catch {
+        // Silently skip any individual group that fails (e.g. edge cases with
+        // tabs that cannot be grouped despite passing the filter above).
+      }
+
+      colourIdx++;
     }
 
     await refreshTabs();
@@ -189,7 +209,7 @@ async function onOrganiseTabs() {
 // ─── 2. Close by Category ─────────────────────────────────────────────────────
 
 function renderCategoryRows() {
-  const categories = categorizeTabs(allTabs);
+  const categories = categorizeTabsWithCategories(allTabs, userCategories);
   categoryRowsEl.innerHTML = '';
   let anyVisible = false;
 

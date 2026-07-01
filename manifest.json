@@ -9,6 +9,10 @@
     "128": "icons/icon128.png"
   },
   "permissions": ["tabs", "storage", "tabGroups"],
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
   "action": {
     "default_title": "TabMate",
     "default_icon": {
