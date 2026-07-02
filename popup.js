@@ -327,7 +327,7 @@ async function onDeleteDuplicates() {
   if (duplicateGroups.length === 0) return;
 
   const tabsToClose = duplicateGroups.flatMap(
-    (group) => getDuplicateGroupSummary(group).tabsToClose
+    (group) => getDuplicateGroupSummary(group, closePinnedDuplicates).tabsToClose
   );
 
   if (tabsToClose.length === 0) return;

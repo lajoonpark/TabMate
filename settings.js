@@ -218,6 +218,7 @@ function renderCategoryList() {
       !isOther && index < categories.length - 1 && !(otherIsLast && index === categories.length - 2);
     const canMoveUp = !isFirst && !isOther;
     const ruleCount = (category.rules ?? []).length;
+    const ruleCountLabel = ruleCount === 0 ? 'No' : String(ruleCount);
 
     const item = document.createElement('div');
     item.className = 'cat-item';
@@ -233,7 +234,7 @@ function renderCategoryList() {
       <span class="cat-item__colour" style="background:${escapeHtml(colourHex(category.colour ?? 'grey'))}" aria-hidden="true"></span>
       <div class="cat-item__info">
         <span class="cat-item__name">${escapeHtml(category.name)}</span>
-        <span class="cat-item__rules">${ruleCount || 'No'} ${ruleCount === 1 ? 'rule' : 'rules'}${category.undeletable ? ' · fallback' : ''}</span>
+        <span class="cat-item__rules">${ruleCountLabel} ${ruleCount === 1 ? 'rule' : 'rules'}${category.undeletable ? ' · fallback' : ''}</span>
       </div>
       <div class="cat-item__actions">
         <button class="btn-edit-cat" type="button" data-id="${escapeHtml(category.id)}">Edit</button>
@@ -397,12 +398,16 @@ function renderPresetList() {
   }
 
   presets.forEach((preset) => {
+    const presetMeta = `${preset.tabs.length} tab${preset.tabs.length === 1 ? '' : 's'} · ${
+      preset.openBehavior === 'replaceCurrentTabs' ? 'Replace current tabs' : 'Keep current tabs'
+    }${preset.category ? ` · ${escapeHtml(preset.category)}` : ''}`;
+
     const item = document.createElement('div');
     item.className = 'preset-item';
     item.innerHTML = `
       <div class="preset-item__info">
         <span class="preset-item__name">${escapeHtml(preset.name)}</span>
-        <span class="preset-item__meta">${preset.tabs.length} tab${preset.tabs.length === 1 ? '' : 's'} · ${preset.openBehavior === 'replaceCurrentTabs' ? 'Replace current tabs' : 'Keep current tabs'}${preset.category ? ` · ${escapeHtml(preset.category)}` : ''}</span>
+        <span class="preset-item__meta">${presetMeta}</span>
         ${preset.description ? `<span class="preset-item__description">${escapeHtml(preset.description)}</span>` : ''}
       </div>
       <div class="cat-item__actions">
