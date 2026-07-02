@@ -6,9 +6,9 @@
 
 - **Auto-categorisation** — Tabs are automatically grouped into categories (YouTube, Coding, Shopping, Social, and more) based on their domain.
 - **Close by category** — Close an entire group of tabs with one click. Pinned and active tabs are always preserved.
-- **Duplicate detection** — Instantly spot and remove duplicate tabs, keeping your preferred copy.
+- **Duplicate detection** — Choose exact or generalised duplicate detection, then remove duplicate tabs while protecting active and pinned tabs by default.
 - **Undo** — Accidentally closed too many tabs? Restore them with a single click. Undo state persists even after the popup is closed.
-- **Saved boards** — Foundation for saving sets of tabs to named boards (data layer in place; full UI coming in a future release).
+- **Presets** — Save reusable tab sets, manage them from Settings, and open them from the popup with safe replace behaviour.
 
 ## Default categories
 
@@ -38,12 +38,15 @@ School · Work · Shopping · Entertainment · Social · Research · Coding · O
 manifest.json          MV3 manifest — name, permissions, background module
 popup.html             Extension popup shell (390 × 620 px)
 popup.js               Popup UI — rendering and event handling
+settings.html          Settings page for categories, presets, and duplicate detection
+settings.js            Settings page logic and persistence
 background.js          Service worker — tab close/restore, storage writes
-styles.css             CSS custom-properties design system
+styles.css             Popup CSS custom-properties design system
+settings.css           Settings page styles
 lib/
-  defaults.js          Default categories, boards, and settings
+  defaults.js          Default categories, presets, boards, and settings
   storage.js           Storage abstraction (sync for settings, local for data)
-  utils.js             Shared utilities — URL parsing, categorisation, deduplication
+  utils.js             Shared utilities — URL parsing, categorisation, presets, deduplication
 icons/                 Extension icons (16 × 16, 48 × 48, 128 × 128)
 ```
 
@@ -51,7 +54,7 @@ icons/                 Extension icons (16 × 16, 48 × 48, 128 × 128)
 
 - **`lib/storage.js`** is the single source of truth for all storage access. UI code never calls `chrome.storage` directly.
 - **`lib/utils.js`** contains pure, environment-agnostic functions for URL normalisation, tab categorisation, and duplicate detection. Both the popup and any future settings/options pages can import from it without modification.
-- **`lib/defaults.js`** defines the seeded default data: 8 built-in categories, the undeletable "Unorganised" board, and all settings with sensible defaults.
+- **`lib/defaults.js`** defines the seeded default data: 8 built-in categories, persistent presets, the undeletable "Unorganised" board, and all settings with sensible defaults.
 - `chrome.storage.sync` is used for settings and categories (small payloads that sync across devices).
 - `chrome.storage.local` is used for boards, saved tabs, and undo state (potentially larger payloads).
 

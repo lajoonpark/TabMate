@@ -3,13 +3,14 @@ import {
   findDuplicateGroups,
   isClosableTab,
   isInternalUrl,
-  selectPreferredTab,
+  planDuplicateTabRemoval,
   escapeHtml,
 } from './lib/utils.js';
 import {
   getUndoTabs,
   getSettings,
   setSettings,
+  getPresets,
   getBoards,
   setBoards,
   getCategories,
@@ -22,6 +23,7 @@ let duplicateGroups = [];
 let lastClosedTabs = [];
 let confirmationThreshold = 5;
 let userCategories = [];
+let closePinnedDuplicates = false;
 
 /** Currently open sub-panel id, or null. */
 let activePanel = null;
@@ -64,6 +66,11 @@ function sendRuntimeMessage(message) {
 function showActionError(error, fallbackMessage) {
   console.error(error);
   window.alert(error instanceof Error && error.message ? error.message : fallbackMessage);
+}
+
+function getDuplicateGroupSummary(group, closePinnedTabs = false) {
+  const { keep, tabsToClose } = planDuplicateTabRemoval(group.tabs, { closePinnedTabs });
+  return { ...group, keep, tabsToClose };
 }
 
 // ─── Sub-panel toggle ─────────────────────────────────────────────────────────
@@ -131,17 +138,31 @@ async function refreshTabs() {
     getCategories(),
   ]);
 
-  const { enabled: dedupeEnabled = true, ignoreHash, ignoreQuery } = settings.duplicateDetection;
-  duplicateGroups = dedupeEnabled ? findDuplicateGroups(allTabs, { ignoreHash, ignoreQuery }) : [];
+  const {
+    enabled: dedupeEnabled = true,
+    mode = 'exact',
+    ignoreHash,
+    ignoreQuery,
+  } = settings.duplicateDetection;
+  closePinnedDuplicates = settings.duplicateDetection?.closePinnedTabs ?? false;
+  duplicateGroups = dedupeEnabled
+    ? findDuplicateGroups(allTabs, { mode, ignoreHash, ignoreQuery })
+    : [];
 
   summaryEl.textContent = `${allTabs.length} tab${allTabs.length === 1 ? '' : 's'} open`;
 
   // Duplicate tile badge
-  const dupCount = duplicateGroups.reduce((sum, g) => sum + g.tabs.length - 1, 0);
+  const removableGroups = duplicateGroups.map((group) =>
+    getDuplicateGroupSummary(group, closePinnedDuplicates)
+  );
+  const dupCount = removableGroups.reduce((sum, group) => sum + group.tabsToClose.length, 0);
   if (dupCount > 0) {
     dupBadge.textContent = dupCount;
     dupBadge.classList.remove('hidden');
-    dupSub.textContent = `${dupCount} extra cop${dupCount === 1 ? 'y' : 'ies'} found`;
+    dupSub.textContent = `${dupCount} duplicate tab${dupCount === 1 ? '' : 's'} can be removed`;
+  } else if (duplicateGroups.length > 0) {
+    dupBadge.classList.add('hidden');
+    dupSub.textContent = 'Duplicates found, but protected tabs are kept';
   } else {
     dupBadge.classList.add('hidden');
     dupSub.textContent = 'No duplicates found';
@@ -267,28 +288,35 @@ function renderDuplicateDetail() {
     return;
   }
 
-  const totalExtra = duplicateGroups.reduce((sum, g) => sum + g.tabs.length - 1, 0);
+  const summarizedGroups = duplicateGroups.map((group) =>
+    getDuplicateGroupSummary(group, closePinnedDuplicates)
+  );
+  const totalExtra = summarizedGroups.reduce((sum, group) => sum + group.tabsToClose.length, 0);
   const summaryDiv = document.createElement('p');
   summaryDiv.className = 'dup-summary';
-  summaryDiv.innerHTML = `Found <strong>${totalExtra}</strong> extra cop${totalExtra === 1 ? 'y' : 'ies'} across <strong>${duplicateGroups.length}</strong> URL${duplicateGroups.length === 1 ? '' : 's'}.`;
+  summaryDiv.innerHTML =
+    totalExtra > 0
+      ? `Found <strong>${duplicateGroups.length}</strong> duplicate group${duplicateGroups.length === 1 ? '' : 's'}. <strong>${totalExtra}</strong> tab${totalExtra === 1 ? '' : 's'} can be removed.`
+      : `Found <strong>${duplicateGroups.length}</strong> duplicate group${duplicateGroups.length === 1 ? '' : 's'}, but only active or pinned tabs remain protected.`;
   duplicateDetailEl.appendChild(summaryDiv);
 
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'btn-delete-all';
   deleteBtn.type = 'button';
   deleteBtn.textContent = `Delete ${totalExtra} duplicate${totalExtra === 1 ? '' : 's'}`;
+  deleteBtn.disabled = totalExtra === 0;
   deleteBtn.addEventListener('click', onDeleteDuplicates);
   duplicateDetailEl.appendChild(deleteBtn);
 
   const list = document.createElement('ul');
   list.className = 'dup-list';
-  duplicateGroups.forEach((group) => {
-    const extra = group.tabs.length - 1;
+  summarizedGroups.forEach((group) => {
     const li = document.createElement('li');
     li.className = 'dup-item';
     li.innerHTML = `
-      <span class="dup-item__url">${escapeHtml(group.url)}</span>
+      <span class="dup-item__url">${escapeHtml(group.label)}</span>
       <span class="dup-item__count">×${group.tabs.length}</span>
+      <span class="dup-item__meta">${group.tabsToClose.length} removable</span>
     `;
     list.appendChild(li);
   });
@@ -298,14 +326,9 @@ function renderDuplicateDetail() {
 async function onDeleteDuplicates() {
   if (duplicateGroups.length === 0) return;
 
-  const tabsToClose = [];
-  duplicateGroups.forEach((group) => {
-    const keep = selectPreferredTab(group.tabs);
-    if (!keep) return;
-    group.tabs.forEach((tab) => {
-      if (tab.id !== keep.id && isClosableTab(tab)) tabsToClose.push(tab);
-    });
-  });
+  const tabsToClose = duplicateGroups.flatMap(
+    (group) => getDuplicateGroupSummary(group).tabsToClose
+  );
 
   if (tabsToClose.length === 0) return;
 
@@ -328,43 +351,55 @@ async function onDeleteDuplicates() {
 async function renderPresets() {
   presetRowsEl.innerHTML = '';
 
-  const boards = await getBoards();
-  const withTabs = boards.filter((b) => b.tabs.length > 0);
+  const presets = await getPresets();
+  const withTabs = presets.filter((preset) => preset.tabs.length > 0);
 
   if (withTabs.length === 0) {
     presetRowsEl.innerHTML =
-      '<p class="panel-empty">No presets yet. Save tabs to a board to create one.</p>';
+      '<p class="panel-empty">No presets yet. Create one in TabMate Settings.</p>';
     return;
   }
 
-  withTabs.forEach((board) => {
+  withTabs.forEach((preset) => {
     const row = document.createElement('div');
     row.className = 'preset-row';
     row.innerHTML = `
       <div class="preset-row__info">
-        <span class="preset-row__name">${escapeHtml(board.name)}</span>
-        <span class="preset-row__count">${board.tabs.length} tab${board.tabs.length === 1 ? '' : 's'}</span>
+        <span class="preset-row__name">${escapeHtml(preset.name)}</span>
+        <span class="preset-row__count">${preset.tabs.length} tab${preset.tabs.length === 1 ? '' : 's'} · ${preset.openBehavior === 'replaceCurrentTabs' ? 'Replace current tabs' : 'Keep current tabs'}</span>
+        ${preset.description ? `<span class="preset-row__description">${escapeHtml(preset.description)}</span>` : ''}
       </div>
-      <button class="btn-open-preset" type="button">Open all</button>
+      <button class="btn-open-preset ${preset.openBehavior === 'replaceCurrentTabs' ? 'btn-open-preset--replace' : ''}" type="button">${preset.openBehavior === 'replaceCurrentTabs' ? 'Replace' : 'Open'}</button>
     `;
-    row.querySelector('button').addEventListener('click', () => onOpenPreset(board));
+    row.querySelector('button').addEventListener('click', () => onOpenPreset(preset));
     presetRowsEl.appendChild(row);
   });
 }
 
-async function onOpenPreset(board) {
-  if (board.tabs.length === 0) return;
-
-  const confirmed =
-    board.tabs.length <= confirmationThreshold ||
-    window.confirm(`Open ${board.tabs.length} tab${board.tabs.length === 1 ? '' : 's'} from "${board.name}"?`);
-
-  if (!confirmed) return;
+async function onOpenPreset(preset) {
+  if (preset.tabs.length === 0) return;
 
   try {
-    for (const tab of board.tabs) {
-      await chrome.tabs.create({ url: tab.url, active: false });
+    if (preset.openBehavior === 'replaceCurrentTabs') {
+      const currentTabs = await chrome.tabs.query({ currentWindow: true });
+      const tabsToClose = currentTabs.filter((tab) => Number.isInteger(tab.id) && !tab.pinned);
+      const confirmed =
+        tabsToClose.length === 0 ||
+        window.confirm(
+          `Open "${preset.name}" and close ${tabsToClose.length} non-pinned tab${tabsToClose.length === 1 ? '' : 's'} first?\n\nPinned tabs will stay open.`
+        );
+
+      if (!confirmed) return;
+
+      if (tabsToClose.length > 0) {
+        await closeTabsAndStoreUndo(tabsToClose);
+      }
     }
+
+    for (const [index, tab] of preset.tabs.entries()) {
+      await chrome.tabs.create({ url: tab.url, active: index === 0 });
+    }
+    await refreshTabs();
   } catch (error) {
     showActionError(error, 'Unable to open preset tabs.');
   }
@@ -550,4 +585,3 @@ async function init() {
 }
 
 init();
-

@@ -346,6 +346,12 @@ body {
   padding: 1px 6px;
 }
 
+.dup-item__meta {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
 /* ===== Preset rows (inside sub-panel) ===== */
 .preset-rows { display: grid; }
 
@@ -375,6 +381,13 @@ body {
   color: var(--muted);
 }
 
+.preset-row__description {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
 .btn-open-preset {
   flex-shrink: 0;
   padding: 4px 10px;
@@ -389,6 +402,8 @@ body {
 }
 .btn-open-preset:hover { filter: brightness(1.1); }
 .btn-open-preset:focus-visible { outline: 2px solid var(--turquoise); outline-offset: 2px; }
+.btn-open-preset--replace { background: var(--red); }
+.btn-open-preset--replace:focus-visible { outline-color: var(--red); }
 
 /* ===== Shortcut rows (inside sub-panel) ===== */
 .shortcut-rows { display: grid; }
@@ -508,4 +523,3 @@ body {
 
 /* ===== Utility ===== */
 .hidden { display: none !important; }
-
