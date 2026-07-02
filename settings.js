@@ -75,8 +75,8 @@ function colourHex(colour) {
   return CATEGORY_COLOURS.find((item) => item.value === colour)?.hex ?? '#9ca3af';
 }
 
-function generateId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+function generateId(idPrefix) {
+  return `${idPrefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
 function getSelectedColour() {
@@ -217,6 +217,7 @@ function renderCategoryList() {
     const canMoveDown =
       !isOther && index < categories.length - 1 && !(otherIsLast && index === categories.length - 2);
     const canMoveUp = !isFirst && !isOther;
+    const ruleCount = (category.rules ?? []).length;
 
     const item = document.createElement('div');
     item.className = 'cat-item';
@@ -232,7 +233,7 @@ function renderCategoryList() {
       <span class="cat-item__colour" style="background:${escapeHtml(colourHex(category.colour ?? 'grey'))}" aria-hidden="true"></span>
       <div class="cat-item__info">
         <span class="cat-item__name">${escapeHtml(category.name)}</span>
-        <span class="cat-item__rules">${(category.rules ?? []).length || 'No'} ${(category.rules ?? []).length === 1 ? 'rule' : 'rules'}${category.undeletable ? ' · fallback' : ''}</span>
+        <span class="cat-item__rules">${ruleCount || 'No'} ${ruleCount === 1 ? 'rule' : 'rules'}${category.undeletable ? ' · fallback' : ''}</span>
       </div>
       <div class="cat-item__actions">
         <button class="btn-edit-cat" type="button" data-id="${escapeHtml(category.id)}">Edit</button>
@@ -545,7 +546,7 @@ async function savePreset() {
   presetNameEl.setCustomValidity('');
 
   const normalizedTabs = [];
-  for (let index = 0; index < draftPresetTabs.length; index += 1) {
+  for (let index = 0; index < draftPresetTabs.length; index++) {
     const tab = draftPresetTabs[index];
     const url = validateUrl(tab.url ?? '');
     if (!url) {
