@@ -8,8 +8,6 @@
   </head>
   <body>
     <div class="settings-layout">
-
-      <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar__brand">
           <img src="icons/icon48.png" alt="TabMate logo" class="sidebar__logo" />
@@ -22,106 +20,210 @@
             </svg>
             Categories
           </button>
+          <button class="sidebar__nav-item" data-section="presets" type="button">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
+            </svg>
+            Presets
+          </button>
+          <button class="sidebar__nav-item" data-section="duplicates" type="button">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+            </svg>
+            Duplicate Detection
+          </button>
         </nav>
       </aside>
 
-      <!-- Main content -->
       <main class="settings-main">
-
-        <!-- ── Categories section ─────────────────────────────────── -->
-        <section id="section-categories" class="settings-section">
-          <div class="section-header">
-            <div>
-              <h1 class="section-header__title">Categories</h1>
-              <p class="section-header__sub">
-                Use the ▲ ▼ buttons to reorder. Tabs are matched from top to bottom — the first matching category wins.
-              </p>
-            </div>
-            <button id="btn-add-category" class="btn-primary" type="button">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
-              </svg>
-              Add Category
-            </button>
-          </div>
-
-          <!-- Editor panel (hidden until editing) -->
-          <div id="category-editor" class="category-editor hidden" role="dialog" aria-label="Edit category" aria-modal="true">
-            <h2 id="editor-title" class="category-editor__title">New Category</h2>
-
-            <div class="editor-field">
-              <label class="editor-label" for="editor-name">Name</label>
-              <input
-                id="editor-name"
-                class="editor-input"
-                type="text"
-                placeholder="e.g. Finance"
-                maxlength="40"
-                autocomplete="off"
-              />
+        <div class="settings-stack">
+          <section id="section-categories" class="settings-section">
+            <div class="section-header">
+              <div>
+                <h1 class="section-header__title">Categories</h1>
+                <p class="section-header__sub">
+                  Use the ▲ ▼ buttons to reorder. Tabs are matched from top to bottom — the first matching category wins.
+                </p>
+              </div>
+              <button id="btn-add-category" class="btn-primary" type="button">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                </svg>
+                Add Category
+              </button>
             </div>
 
-            <div class="editor-field">
-              <span class="editor-label">Colour</span>
-              <div id="colour-picker" class="colour-picker" role="radiogroup" aria-label="Category colour">
-                <!-- Rendered by settings.js -->
+            <div id="category-editor" class="category-editor hidden" role="dialog" aria-label="Edit category" aria-modal="true">
+              <h2 id="editor-title" class="category-editor__title">New Category</h2>
+
+              <div class="editor-field">
+                <label class="editor-label" for="editor-name">Name</label>
+                <input
+                  id="editor-name"
+                  class="editor-input"
+                  type="text"
+                  placeholder="e.g. Finance"
+                  maxlength="40"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="editor-field">
+                <span class="editor-label">Colour</span>
+                <div id="colour-picker" class="colour-picker" role="radiogroup" aria-label="Category colour"></div>
+              </div>
+
+              <div class="editor-field">
+                <div class="rules-header">
+                  <span class="editor-label">Matching Rules</span>
+                  <button id="btn-add-rule" class="btn-link" type="button">+ Add rule</button>
+                </div>
+                <p class="editor-hint">
+                  Tabs are matched against rules in order. A tab matches if <em>any</em> rule passes.
+                </p>
+                <div id="rules-list" class="rules-list" aria-label="Matching rules"></div>
+                <p id="rules-empty" class="rules-empty hidden">No rules yet — this category won't match any tabs automatically.</p>
+              </div>
+
+              <div class="editor-actions">
+                <button id="btn-save-category" class="btn-primary" type="button">Save</button>
+                <button id="btn-cancel-editor" class="btn-secondary" type="button">Cancel</button>
               </div>
             </div>
 
-            <div class="editor-field">
-              <div class="rules-header">
-                <span class="editor-label">Matching Rules</span>
-                <button id="btn-add-rule" class="btn-link" type="button">+ Add rule</button>
+            <div id="category-list" class="category-list" aria-label="Categories"></div>
+
+            <div class="preview-card">
+              <h2 class="preview-card__title">Test a URL or title</h2>
+              <p class="preview-card__sub">Paste a URL or title to see which category it would match.</p>
+              <div class="preview-inputs">
+                <input
+                  id="preview-url"
+                  class="editor-input"
+                  type="url"
+                  placeholder="https://example.com"
+                  autocomplete="off"
+                />
+                <input
+                  id="preview-title"
+                  class="editor-input"
+                  type="text"
+                  placeholder="Page title (optional)"
+                  autocomplete="off"
+                />
+                <button id="btn-preview" class="btn-primary" type="button">Test</button>
               </div>
-              <p class="editor-hint">
-                Tabs are matched against rules in order. A tab matches if <em>any</em> rule passes.
-              </p>
-              <div id="rules-list" class="rules-list" aria-label="Matching rules">
-                <!-- Rendered by settings.js -->
+              <div id="preview-result" class="preview-result hidden" aria-live="polite">
+                Matches:
+                <span id="preview-dot" class="preview-dot"></span>
+                <strong id="preview-match"></strong>
               </div>
-              <p id="rules-empty" class="rules-empty hidden">No rules yet — this category won't match any tabs automatically.</p>
+            </div>
+          </section>
+
+          <section id="section-presets" class="settings-section">
+            <div class="section-header">
+              <div>
+                <h1 class="section-header__title">Presets</h1>
+                <p class="section-header__sub">
+                  Save repeatable tab sets for school, shopping, gaming, and more. Presets persist and can be opened directly from the popup.
+                </p>
+              </div>
+              <button id="btn-add-preset" class="btn-primary" type="button">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                </svg>
+                Add Preset
+              </button>
             </div>
 
-            <div class="editor-actions">
-              <button id="btn-save-category" class="btn-primary" type="button">Save</button>
-              <button id="btn-cancel-editor" class="btn-secondary" type="button">Cancel</button>
-            </div>
-          </div>
+            <div id="preset-editor" class="preset-editor hidden" role="dialog" aria-label="Edit preset" aria-modal="true">
+              <h2 id="preset-editor-title" class="category-editor__title">New Preset</h2>
 
-          <!-- Category list -->
-          <div id="category-list" class="category-list" aria-label="Categories">
-            <!-- Rendered by settings.js -->
-          </div>
+              <div class="editor-grid">
+                <div class="editor-field">
+                  <label class="editor-label" for="preset-name">Name</label>
+                  <input id="preset-name" class="editor-input" type="text" maxlength="60" placeholder="e.g. School" autocomplete="off" />
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label" for="preset-open-behavior">Open behaviour</label>
+                  <select id="preset-open-behavior" class="editor-input editor-select">
+                    <option value="addToCurrentTabs">Open preset and keep current tabs</option>
+                    <option value="replaceCurrentTabs">Open preset and close other non-pinned tabs first</option>
+                  </select>
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label" for="preset-category">Category (optional)</label>
+                  <input id="preset-category" class="editor-input" type="text" maxlength="40" placeholder="e.g. Study" autocomplete="off" />
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label" for="preset-shortcut">Keyboard shortcut reference (optional)</label>
+                  <input id="preset-shortcut" class="editor-input" type="text" maxlength="40" placeholder="e.g. Alt+Shift+S" autocomplete="off" />
+                </div>
+              </div>
 
-          <!-- Preview / test area -->
-          <div class="preview-card">
-            <h2 class="preview-card__title">Test a URL or title</h2>
-            <p class="preview-card__sub">Paste a URL or title to see which category it would match.</p>
-            <div class="preview-inputs">
-              <input
-                id="preview-url"
-                class="editor-input"
-                type="url"
-                placeholder="https://example.com"
-                autocomplete="off"
-              />
-              <input
-                id="preview-title"
-                class="editor-input"
-                type="text"
-                placeholder="Page title (optional)"
-                autocomplete="off"
-              />
-              <button id="btn-preview" class="btn-primary" type="button">Test</button>
-            </div>
-            <div id="preview-result" class="preview-result hidden" aria-live="polite">
-              Matches:
-              <span id="preview-dot" class="preview-dot"></span>
-              <strong id="preview-match"></strong>
-            </div>
-          </div>
-        </section>
+              <div class="editor-field">
+                <label class="editor-label" for="preset-description">Description (optional)</label>
+                <textarea id="preset-description" class="editor-input editor-textarea" rows="3" placeholder="What is this preset for?"></textarea>
+              </div>
 
+              <div class="editor-field">
+                <div class="rules-header">
+                  <span class="editor-label">Preset Tabs</span>
+                  <div class="editor-toolbar">
+                    <button id="btn-add-preset-tab" class="btn-link" type="button">+ Add URL</button>
+                    <button id="btn-import-current-tabs" class="btn-link" type="button">Import current tabs</button>
+                  </div>
+                </div>
+                <p class="editor-hint">
+                  Reorder tabs with ▲ ▼. Internal browser pages are skipped when importing from the current window.
+                </p>
+                <div id="preset-tabs-list" class="preset-tabs-list" aria-label="Preset tabs"></div>
+                <p id="preset-tabs-empty" class="rules-empty hidden">No tabs yet — add URLs manually or import the current window.</p>
+              </div>
+
+              <div class="editor-actions">
+                <button id="btn-save-preset" class="btn-primary" type="button">Save</button>
+                <button id="btn-cancel-preset" class="btn-secondary" type="button">Cancel</button>
+              </div>
+            </div>
+
+            <div id="preset-list" class="preset-list" aria-label="Presets"></div>
+          </section>
+
+          <section id="section-duplicates" class="settings-section">
+            <div class="section-header">
+              <div>
+                <h1 class="section-header__title">Duplicate Detection</h1>
+                <p class="section-header__sub">
+                  Choose how TabMate decides which tabs belong in the same duplicate group. The popup always protects active tabs and pinned tabs by default.
+                </p>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="duplicate-option">
+                <label class="duplicate-option__label">
+                  <input id="duplicate-mode-exact" name="duplicate-mode" type="radio" value="exact" />
+                  <span>
+                    <strong>Exact mode</strong>
+                    <span class="duplicate-option__copy">Only identical normalised URLs count as duplicates. For example, <em>reddit.com</em> and <em>reddit.com/ikea</em> stay separate.</span>
+                  </span>
+                </label>
+              </div>
+              <div class="duplicate-option">
+                <label class="duplicate-option__label">
+                  <input id="duplicate-mode-generalized" name="duplicate-mode" type="radio" value="generalized" />
+                  <span>
+                    <strong>Generalised mode</strong>
+                    <span class="duplicate-option__copy">Tabs on the same domain are grouped together. For example, <em>reddit.com</em> and <em>reddit.com/ikea</em> can be flagged together.</span>
+                  </span>
+                </label>
+              </div>
+              <p id="duplicate-settings-status" class="setting-status hidden" aria-live="polite"></p>
+            </div>
+          </section>
+        </div>
       </main>
     </div>
 

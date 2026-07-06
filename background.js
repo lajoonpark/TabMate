@@ -1,6 +1,6 @@
 import { initDefaults, getUndoTabs, setUndoTabs, clearUndoTabs } from './lib/storage.js';
 
-// Seed default categories, boards, and settings on install or update.
+// Seed default categories, presets, boards, and settings on install or update.
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install' || reason === 'update') {
     initDefaults().catch(console.error);
