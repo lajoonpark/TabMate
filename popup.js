@@ -13,7 +13,10 @@ import {
   getPresets,
   getBoards,
   setBoards,
+  getSavedTabs,
+  setSavedTabs,
   getCategories,
+  saveTabToBoard,
 } from './lib/storage.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -415,27 +418,112 @@ async function onSaveCurrentTab() {
       return;
     }
 
-    const settings = await getSettings();
-    const boards = await getBoards();
-    const target =
-      boards.find((b) => b.id === settings.defaultBoardId) || boards.find((b) => b.isDefault) || boards[0];
+    const [settings, boards] = await Promise.all([getSettings(), getBoards()]);
+    const defaultBoard =
+      boards.find((b) => b.id === settings.defaultBoardId) ||
+      boards.find((b) => b.isDefault) ||
+      boards[0];
 
-    if (!target) {
+    if (!defaultBoard) {
       window.alert('No board available to save to.');
       return;
     }
 
-    // savedAt is stored as a Unix timestamp in milliseconds.
-    target.tabs.push({ title: activeTab.title || 'Untitled', url: activeTab.url, savedAt: Date.now() });
-    await setBoards(boards);
+    // Show inline board picker inside the panel
+    const panel = document.getElementById('panel-save');
+    const saveContentEl = document.getElementById('save-panel-content');
+    if (panel && saveContentEl) {
+      renderSavePanel(activeTab, boards, defaultBoard);
+      openPanel('panel-save', 'btn-save');
+    } else {
+      // Fallback: save directly to default board
+      await doSaveTab(activeTab, defaultBoard.id);
+    }
+  } catch (error) {
+    showActionError(error, 'Unable to save the current tab.');
+  }
+}
 
-    // Brief visual feedback on the tile itself
-    const btn = document.getElementById('btn-save');
-    const originalSub = btn ? btn.querySelector('.tile__sub') : null;
-    if (originalSub) {
-      const originalText = originalSub.textContent;
-      originalSub.textContent = `Saved to ${target.name}!`;
-      setTimeout(() => { originalSub.textContent = originalText; }, 2000);
+function renderSavePanel(activeTab, boards, defaultBoard) {
+  const saveContentEl = document.getElementById('save-panel-content');
+  if (!saveContentEl) return;
+
+  const boardOptions = boards.map((b) =>
+    `<option value="${escapeHtml(b.id)}" ${b.id === defaultBoard.id ? 'selected' : ''}>${escapeHtml(b.name)}</option>`
+  ).join('');
+
+  saveContentEl.innerHTML = `
+    <div class="save-tab-info">
+      <p class="save-tab-info__title">${escapeHtml(activeTab.title || 'Untitled')}</p>
+      <p class="save-tab-info__url">${escapeHtml(activeTab.url)}</p>
+    </div>
+    <div class="save-tab-board">
+      <label class="save-tab-board__label" for="save-board-select">Save to board</label>
+      <select id="save-board-select" class="editor-input editor-select">${boardOptions}</select>
+    </div>
+    <div id="save-tab-status" class="save-tab-status hidden" aria-live="polite"></div>
+    <div class="save-tab-actions">
+      <button id="btn-do-save" class="btn-primary" type="button">Save Tab</button>
+    </div>
+  `;
+
+  saveContentEl.querySelector('#btn-do-save').addEventListener('click', async () => {
+    const boardId = saveContentEl.querySelector('#save-board-select').value;
+    await doSaveTab(activeTab, boardId);
+  });
+}
+
+async function doSaveTab(activeTab, boardId) {
+  const statusEl = document.getElementById('save-tab-status');
+  const saveBtn = document.getElementById('btn-do-save');
+
+  try {
+    const result = await saveTabToBoard(
+      { title: activeTab.title || 'Untitled', url: activeTab.url, faviconUrl: activeTab.favIconUrl || undefined },
+      boardId,
+    );
+
+    if (result.duplicate) {
+      if (statusEl) {
+        statusEl.textContent = 'This tab is already saved in that board.';
+        statusEl.classList.remove('hidden', 'save-tab-status--ok');
+        statusEl.classList.add('save-tab-status--warn');
+      }
+
+      const confirmed = window.confirm('This tab is already saved in that board. Save a duplicate anyway?');
+      if (!confirmed) return;
+
+      // Force save by using direct storage if user confirms
+      const [boards2, savedTabs2] = await Promise.all([getBoards(), getSavedTabs()]);
+      const board2 = boards2.find((b) => b.id === boardId);
+      if (!board2) return;
+      const now2 = Date.now();
+      savedTabs2.push({
+        id: `stab_${now2.toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        boardId,
+        title: activeTab.title || 'Untitled',
+        url: activeTab.url,
+        ...(activeTab.favIconUrl ? { faviconUrl: activeTab.favIconUrl } : {}),
+        savedAt: now2,
+      });
+      board2.updatedAt = now2;
+      await Promise.all([setSavedTabs(savedTabs2), setBoards(boards2)]);
+    }
+
+    if (statusEl) {
+      const currentBoards = await getBoards();
+      const board = currentBoards.find((b) => b.id === boardId);
+      statusEl.textContent = `Saved to "${board?.name ?? 'board'}"!`;
+      statusEl.classList.remove('hidden', 'save-tab-status--warn');
+      statusEl.classList.add('save-tab-status--ok');
+    }
+    if (saveBtn) {
+      saveBtn.textContent = 'Saved!';
+      saveBtn.disabled = true;
+      setTimeout(() => {
+        saveBtn.textContent = 'Save Tab';
+        saveBtn.disabled = false;
+      }, 2000);
     }
   } catch (error) {
     showActionError(error, 'Unable to save the current tab.');
@@ -463,6 +551,22 @@ async function renderShortcuts() {
         <kbd class="shortcut-row__key">${escapeHtml(cmd.shortcut || 'Not set')}</kbd>
       `;
       shortcutRowsEl.appendChild(row);
+    });
+
+    // Link to browser shortcut settings
+    const hint = document.createElement('div');
+    hint.className = 'shortcut-hint';
+    hint.innerHTML = `
+      <p class="shortcut-hint__text">To change shortcuts, use your browser's extension shortcut settings.</p>
+      <button id="btn-open-shortcuts-page" class="footer-link" type="button">
+        Open browser shortcut settings
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+    `;
+    shortcutRowsEl.appendChild(hint);
+
+    hint.querySelector('#btn-open-shortcuts-page').addEventListener('click', () => {
+      chrome.tabs.create({ url: 'chrome://extensions/shortcuts', active: true });
     });
   } catch {
     shortcutRowsEl.innerHTML = '<p class="panel-empty">Unable to load shortcuts.</p>';

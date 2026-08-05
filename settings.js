@@ -5,6 +5,10 @@ import {
   setPresets,
   getSettings,
   setSettings,
+  getBoards,
+  setBoards,
+  getSavedTabs,
+  setSavedTabs,
 } from './lib/storage.js';
 import {
   CATEGORY_COLOURS,
@@ -19,11 +23,18 @@ let categories = [];
 let presets = [];
 /** @type {import('./lib/defaults.js').Settings | null} */
 let userSettings = null;
+/** @type {import('./lib/defaults.js').Board[]} */
+let boards = [];
+/** @type {import('./lib/defaults.js').SavedTab[]} */
+let savedTabs = [];
+/** Currently open board id for the tabs view, or null */
+let openBoardId = null;
 
 let editingId = null;
 let draftRules = [];
 let editingPresetId = null;
 let draftPresetTabs = [];
+let editingBoardId = null;
 
 const navItems = Array.from(document.querySelectorAll('.sidebar__nav-item'));
 
@@ -63,6 +74,37 @@ const btnCancelPreset = document.getElementById('btn-cancel-preset');
 
 const duplicateModeInputs = Array.from(document.querySelectorAll('input[name="duplicate-mode"]'));
 const duplicateSettingsStatusEl = document.getElementById('duplicate-settings-status');
+
+// ─── Boards elements ──────────────────────────────────────────────────────────
+const boardListEl = document.getElementById('board-list');
+const boardEditorEl = document.getElementById('board-editor');
+const boardEditorTitleEl = document.getElementById('board-editor-title');
+const boardNameEl = document.getElementById('board-name');
+const boardDescriptionEl = document.getElementById('board-description');
+const btnAddBoard = document.getElementById('btn-add-board');
+const btnSaveBoard = document.getElementById('btn-save-board');
+const btnCancelBoard = document.getElementById('btn-cancel-board');
+
+const boardTabsViewEl = document.getElementById('board-tabs-view');
+const boardTabsTitleEl = document.getElementById('board-tabs-title');
+const boardTabsListEl = document.getElementById('board-tabs-list');
+const btnBackBoards = document.getElementById('btn-back-boards');
+const btnSelectAllTabs = document.getElementById('btn-select-all-tabs');
+const btnDeselectAllTabs = document.getElementById('btn-deselect-all-tabs');
+const btnOpenSelectedTabs = document.getElementById('btn-open-selected-tabs');
+const btnOpenAllTabs = document.getElementById('btn-open-all-tabs');
+const btnMoveSelectedTabs = document.getElementById('btn-move-selected-tabs');
+const btnDeleteSelectedTabs = document.getElementById('btn-delete-selected-tabs');
+
+// ─── Shortcuts elements ───────────────────────────────────────────────────────
+const shortcutCommandsListEl = document.getElementById('shortcut-commands-list');
+const slotPreset1El = document.getElementById('slot-preset-1');
+const slotBoard1El = document.getElementById('slot-board-1');
+const slotBoard2El = document.getElementById('slot-board-2');
+const slotBoard3El = document.getElementById('slot-board-3');
+const shortcutSlotStatusEl = document.getElementById('shortcut-slots-status');
+const btnSaveShortcutSlots = document.getElementById('btn-save-shortcut-slots');
+const btnOpenShortcutsPage = document.getElementById('btn-open-shortcuts-page');
 
 const RULE_TYPE_LABELS = {
   exactDomain: 'Exact domain',
@@ -645,6 +687,376 @@ async function updateDuplicateMode(mode) {
   }
 }
 
+// ─── Boards ───────────────────────────────────────────────────────────────────
+
+function renderBoardList() {
+  boardListEl.innerHTML = '';
+
+  if (boards.length === 0) {
+    boardListEl.innerHTML = '<p class="list-empty">No boards yet.</p>';
+    return;
+  }
+
+  boards.forEach((board) => {
+    const tabCount = savedTabs.filter((t) => t.boardId === board.id).length;
+    const isSystem = board.isSystem;
+    const isDefault = board.isDefault;
+
+    const item = document.createElement('div');
+    item.className = 'board-item';
+    item.innerHTML = `
+      <div class="board-item__info">
+        <span class="board-item__name">${escapeHtml(board.name)}${isDefault ? ' <span class="board-item__badge">Default</span>' : ''}</span>
+        <span class="board-item__meta">${tabCount} saved tab${tabCount === 1 ? '' : 's'}${board.description ? ' · ' + escapeHtml(board.description) : ''}</span>
+      </div>
+      <div class="cat-item__actions">
+        <button class="btn-edit-cat btn-open-board" type="button" data-id="${escapeHtml(board.id)}">Open</button>
+        ${isDefault ? '' : `<button class="btn-edit-cat btn-set-default-board" type="button" data-id="${escapeHtml(board.id)}">Set default</button>`}
+        ${isSystem ? '' : `<button class="btn-edit-cat btn-edit-board" type="button" data-id="${escapeHtml(board.id)}">Edit</button>`}
+        ${isSystem
+          ? '<button class="btn-delete-cat" type="button" disabled title="System boards cannot be deleted">Delete</button>'
+          : `<button class="btn-delete-cat btn-delete-board btn-delete-cat--active" type="button" data-id="${escapeHtml(board.id)}">Delete</button>`
+        }
+      </div>
+    `;
+    boardListEl.appendChild(item);
+  });
+
+  boardListEl.querySelectorAll('.btn-open-board').forEach((btn) => {
+    btn.addEventListener('click', () => openBoardTabsView(btn.dataset.id));
+  });
+  boardListEl.querySelectorAll('.btn-set-default-board').forEach((btn) => {
+    btn.addEventListener('click', () => setDefaultBoard(btn.dataset.id));
+  });
+  boardListEl.querySelectorAll('.btn-edit-board').forEach((btn) => {
+    btn.addEventListener('click', () => openBoardEditor(btn.dataset.id));
+  });
+  boardListEl.querySelectorAll('.btn-delete-board').forEach((btn) => {
+    btn.addEventListener('click', () => deleteBoard(btn.dataset.id));
+  });
+}
+
+function openBoardEditor(id) {
+  const board = id ? boards.find((b) => b.id === id) : null;
+  editingBoardId = id ?? null;
+  boardEditorTitleEl.textContent = board ? `Edit "${board.name}"` : 'New Board';
+  boardNameEl.value = board?.name ?? '';
+  boardDescriptionEl.value = board?.description ?? '';
+  boardEditorEl.classList.remove('hidden');
+  boardNameEl.focus();
+  boardEditorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeBoardEditor() {
+  boardEditorEl.classList.add('hidden');
+  editingBoardId = null;
+}
+
+async function saveBoard() {
+  const name = boardNameEl.value.trim();
+  if (!name) {
+    boardNameEl.focus();
+    boardNameEl.setCustomValidity('Please enter a board name.');
+    boardNameEl.reportValidity();
+    return;
+  }
+  boardNameEl.setCustomValidity('');
+
+  const now = Date.now();
+  if (editingBoardId) {
+    const index = boards.findIndex((b) => b.id === editingBoardId);
+    if (index !== -1) {
+      boards[index] = {
+        ...boards[index],
+        name,
+        ...(boardDescriptionEl.value.trim() ? { description: boardDescriptionEl.value.trim() } : {}),
+        updatedAt: now,
+      };
+    }
+  } else {
+    const newBoard = {
+      id: generateId('board'),
+      name,
+      ...(boardDescriptionEl.value.trim() ? { description: boardDescriptionEl.value.trim() } : {}),
+      createdAt: now,
+      updatedAt: now,
+      isSystem: false,
+      isDefault: false,
+    };
+    boards.push(newBoard);
+  }
+
+  await persistBoards();
+  closeBoardEditor();
+  renderBoardList();
+}
+
+async function deleteBoard(id) {
+  const board = boards.find((b) => b.id === id);
+  if (!board) return;
+  if (board.isSystem) return;
+
+  const tabCount = savedTabs.filter((t) => t.boardId === id).length;
+  const confirmMsg = tabCount > 0
+    ? `Delete board "${board.name}" and its ${tabCount} saved tab${tabCount === 1 ? '' : 's'}?`
+    : `Delete board "${board.name}"?`;
+  if (!window.confirm(confirmMsg)) return;
+
+  boards = boards.filter((b) => b.id !== id);
+  savedTabs = savedTabs.filter((t) => t.boardId !== id);
+
+  // If deleted board was default, reset to unorganised
+  if (board.isDefault) {
+    const unorganised = boards.find((b) => b.id === 'unorganised');
+    if (unorganised) unorganised.isDefault = true;
+  }
+
+  await Promise.all([persistBoards(), persistSavedTabs()]);
+  renderBoardList();
+}
+
+async function setDefaultBoard(id) {
+  boards = boards.map((b) => ({ ...b, isDefault: b.id === id }));
+
+  if (userSettings) {
+    userSettings = { ...userSettings, defaultBoardId: id };
+    await setSettings(userSettings);
+  }
+
+  await persistBoards();
+  renderBoardList();
+}
+
+async function persistBoards() {
+  try {
+    await setBoards(boards);
+  } catch (error) {
+    console.error('TabMate: failed to save boards', error);
+    window.alert('Failed to save boards. Please try again.');
+  }
+}
+
+async function persistSavedTabs() {
+  try {
+    await setSavedTabs(savedTabs);
+  } catch (error) {
+    console.error('TabMate: failed to save tabs', error);
+    window.alert('Failed to save tabs. Please try again.');
+  }
+}
+
+// ─── Board tabs view ──────────────────────────────────────────────────────────
+
+function openBoardTabsView(boardId) {
+  openBoardId = boardId;
+  const board = boards.find((b) => b.id === boardId);
+  boardTabsTitleEl.textContent = board ? board.name : 'Board';
+
+  boardListEl.classList.add('hidden');
+  boardEditorEl.classList.add('hidden');
+  btnAddBoard.disabled = true;
+  boardTabsViewEl.classList.remove('hidden');
+
+  renderBoardTabs();
+}
+
+function closeBoardTabsView() {
+  openBoardId = null;
+  boardTabsViewEl.classList.add('hidden');
+  boardListEl.classList.remove('hidden');
+  btnAddBoard.disabled = false;
+  renderBoardList();
+}
+
+function getSelectedTabIds() {
+  return Array.from(boardTabsListEl.querySelectorAll('.board-tab-item__checkbox:checked')).map(
+    (cb) => cb.dataset.id,
+  );
+}
+
+function updateBoardTabsToolbar() {
+  const selectedIds = getSelectedTabIds();
+  const hasSelection = selectedIds.length > 0;
+  btnOpenSelectedTabs.disabled = !hasSelection;
+  btnMoveSelectedTabs.disabled = !hasSelection;
+  btnDeleteSelectedTabs.disabled = !hasSelection;
+}
+
+function renderBoardTabs() {
+  boardTabsListEl.innerHTML = '';
+  const boardTabItems = savedTabs.filter((t) => t.boardId === openBoardId);
+
+  if (boardTabItems.length === 0) {
+    boardTabsListEl.innerHTML = '<p class="list-empty">No saved tabs in this board.</p>';
+    updateBoardTabsToolbar();
+    return;
+  }
+
+  boardTabItems.forEach((tab) => {
+    const item = document.createElement('div');
+    item.className = 'board-tab-item';
+    const savedDate = new Date(tab.savedAt).toLocaleDateString(undefined, { dateStyle: 'medium' });
+    item.innerHTML = `
+      <label class="board-tab-item__check">
+        <input class="board-tab-item__checkbox" type="checkbox" data-id="${escapeHtml(tab.id)}" aria-label="Select ${escapeHtml(tab.title)}" />
+      </label>
+      ${tab.faviconUrl ? `<img class="board-tab-item__favicon" src="${escapeHtml(tab.faviconUrl)}" alt="" width="16" height="16" />` : '<span class="board-tab-item__favicon-placeholder"></span>'}
+      <div class="board-tab-item__info">
+        <a class="board-tab-item__title" href="${escapeHtml(tab.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(tab.title)}</a>
+        <span class="board-tab-item__meta">${escapeHtml(tab.url)} · Saved ${savedDate}</span>
+      </div>
+      <button class="btn-delete-cat btn-delete-cat--active board-tab-item__delete" type="button" data-id="${escapeHtml(tab.id)}" aria-label="Delete ${escapeHtml(tab.title)}">Delete</button>
+    `;
+    boardTabsListEl.appendChild(item);
+  });
+
+  boardTabsListEl.querySelectorAll('.board-tab-item__checkbox').forEach((cb) => {
+    cb.addEventListener('change', updateBoardTabsToolbar);
+  });
+
+  boardTabsListEl.querySelectorAll('.board-tab-item__delete').forEach((btn) => {
+    btn.addEventListener('click', () => deleteSavedTab(btn.dataset.id));
+  });
+
+  updateBoardTabsToolbar();
+}
+
+async function deleteSavedTab(id) {
+  savedTabs = savedTabs.filter((t) => t.id !== id);
+  await persistSavedTabs();
+  renderBoardTabs();
+}
+
+async function deleteSelectedTabs() {
+  const ids = new Set(getSelectedTabIds());
+  if (ids.size === 0) return;
+  if (!window.confirm(`Delete ${ids.size} saved tab${ids.size === 1 ? '' : 's'}?`)) return;
+  savedTabs = savedTabs.filter((t) => !ids.has(t.id));
+  await persistSavedTabs();
+  renderBoardTabs();
+}
+
+async function openSelectedTabs() {
+  const ids = new Set(getSelectedTabIds());
+  const tabsToOpen = savedTabs.filter((t) => ids.has(t.id));
+  for (const [index, tab] of tabsToOpen.entries()) {
+    await chrome.tabs.create({ url: tab.url, active: index === 0 });
+  }
+}
+
+async function openAllBoardTabs() {
+  const tabsToOpen = savedTabs.filter((t) => t.boardId === openBoardId);
+  for (const [index, tab] of tabsToOpen.entries()) {
+    await chrome.tabs.create({ url: tab.url, active: index === 0 });
+  }
+}
+
+async function moveSelectedTabs() {
+  const ids = new Set(getSelectedTabIds());
+  if (ids.size === 0) return;
+
+  const otherBoards = boards.filter((b) => b.id !== openBoardId);
+  if (otherBoards.length === 0) {
+    window.alert('No other boards to move tabs to. Create another board first.');
+    return;
+  }
+
+  const options = otherBoards.map((b) => `${b.id}: ${b.name}`).join('\n');
+  const input = window.prompt(`Move ${ids.size} tab${ids.size === 1 ? '' : 's'} to which board?\n\n${options}\n\nEnter board name:`);
+  if (!input) return;
+
+  const target = otherBoards.find((b) => b.name.toLowerCase() === input.trim().toLowerCase());
+  if (!target) {
+    window.alert('Board not found. Please type the exact board name.');
+    return;
+  }
+
+  const now = Date.now();
+  savedTabs = savedTabs.map((t) =>
+    ids.has(t.id) ? { ...t, boardId: target.id } : t
+  );
+  target.updatedAt = now;
+
+  await Promise.all([persistSavedTabs(), persistBoards()]);
+  renderBoardTabs();
+}
+
+// ─── Shortcuts ────────────────────────────────────────────────────────────────
+
+async function renderShortcutCommands() {
+  if (!shortcutCommandsListEl) return;
+  shortcutCommandsListEl.innerHTML = '';
+
+  try {
+    const commands = await chrome.commands.getAll();
+    if (!commands || commands.length === 0) {
+      shortcutCommandsListEl.innerHTML = '<p class="list-empty">No commands registered.</p>';
+      return;
+    }
+
+    commands.forEach((cmd) => {
+      const row = document.createElement('div');
+      row.className = 'shortcut-command-row';
+      row.innerHTML = `
+        <span class="shortcut-command-row__label">${escapeHtml(cmd.description || cmd.name)}</span>
+        <kbd class="shortcut-row__key">${escapeHtml(cmd.shortcut || 'Not set')}</kbd>
+      `;
+      shortcutCommandsListEl.appendChild(row);
+    });
+  } catch {
+    shortcutCommandsListEl.innerHTML = '<p class="list-empty">Unable to load shortcuts.</p>';
+  }
+}
+
+function populateSlotSelects() {
+  const boardOptions = ['<option value="">(none)</option>',
+    ...boards.map((b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`)
+  ].join('');
+  const presetOptions = ['<option value="">(none)</option>',
+    ...presets.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`)
+  ].join('');
+
+  if (slotPreset1El) slotPreset1El.innerHTML = presetOptions;
+  if (slotBoard1El) slotBoard1El.innerHTML = boardOptions;
+  if (slotBoard2El) slotBoard2El.innerHTML = boardOptions;
+  if (slotBoard3El) slotBoard3El.innerHTML = boardOptions;
+
+  const slots = userSettings?.shortcutSlots ?? {};
+  if (slotPreset1El) slotPreset1El.value = slots.presetSlot1 ?? '';
+  if (slotBoard1El) slotBoard1El.value = slots.boardSlot1 ?? '';
+  if (slotBoard2El) slotBoard2El.value = slots.boardSlot2 ?? '';
+  if (slotBoard3El) slotBoard3El.value = slots.boardSlot3 ?? '';
+}
+
+async function saveShortcutSlots() {
+  if (!userSettings) return;
+
+  userSettings = {
+    ...userSettings,
+    shortcutSlots: {
+      presetSlot1: slotPreset1El?.value ?? '',
+      boardSlot1: slotBoard1El?.value ?? '',
+      boardSlot2: slotBoard2El?.value ?? '',
+      boardSlot3: slotBoard3El?.value ?? '',
+    },
+  };
+
+  try {
+    await setSettings(userSettings);
+    if (shortcutSlotStatusEl) {
+      shortcutSlotStatusEl.textContent = 'Shortcut assignments saved.';
+      shortcutSlotStatusEl.classList.remove('hidden', 'setting-status--error');
+    }
+  } catch (error) {
+    console.error(error);
+    if (shortcutSlotStatusEl) {
+      shortcutSlotStatusEl.textContent = 'Failed to save shortcut assignments.';
+      shortcutSlotStatusEl.classList.remove('hidden');
+      shortcutSlotStatusEl.classList.add('setting-status--error');
+    }
+  }
+}
+
 function initSidebarNavigation() {
   navItems.forEach((item) => {
     item.addEventListener('click', () => {
@@ -659,10 +1071,12 @@ function initSidebarNavigation() {
 
 async function init() {
   try {
-    [categories, presets, userSettings] = await Promise.all([
+    [categories, presets, userSettings, boards, savedTabs] = await Promise.all([
       getCategories(),
       getPresets(),
       getSettings(),
+      getBoards(),
+      getSavedTabs(),
     ]);
 
     const otherIndex = categories.findIndex((category) => category.id === 'other');
@@ -675,6 +1089,9 @@ async function init() {
     renderCategoryList();
     renderPresetList();
     renderDuplicateSettings();
+    renderBoardList();
+    await renderShortcutCommands();
+    populateSlotSelects();
   } catch (error) {
     console.error('TabMate: failed to load settings', error);
   }
@@ -708,6 +1125,32 @@ async function init() {
   duplicateModeInputs.forEach((input) => {
     input.addEventListener('change', () => updateDuplicateMode(input.value));
   });
+
+  // Boards
+  btnAddBoard.addEventListener('click', () => openBoardEditor(null));
+  btnSaveBoard.addEventListener('click', saveBoard);
+  btnCancelBoard.addEventListener('click', closeBoardEditor);
+  btnBackBoards.addEventListener('click', closeBoardTabsView);
+  btnSelectAllTabs.addEventListener('click', () => {
+    boardTabsListEl.querySelectorAll('.board-tab-item__checkbox').forEach((cb) => { cb.checked = true; });
+    updateBoardTabsToolbar();
+  });
+  btnDeselectAllTabs.addEventListener('click', () => {
+    boardTabsListEl.querySelectorAll('.board-tab-item__checkbox').forEach((cb) => { cb.checked = false; });
+    updateBoardTabsToolbar();
+  });
+  btnOpenSelectedTabs.addEventListener('click', openSelectedTabs);
+  btnOpenAllTabs.addEventListener('click', openAllBoardTabs);
+  btnMoveSelectedTabs.addEventListener('click', moveSelectedTabs);
+  btnDeleteSelectedTabs.addEventListener('click', deleteSelectedTabs);
+
+  // Shortcuts
+  if (btnSaveShortcutSlots) btnSaveShortcutSlots.addEventListener('click', saveShortcutSlots);
+  if (btnOpenShortcutsPage) {
+    btnOpenShortcutsPage.addEventListener('click', () => {
+      chrome.tabs.create({ url: 'chrome://extensions/shortcuts', active: true });
+    });
+  }
 }
 
 init();

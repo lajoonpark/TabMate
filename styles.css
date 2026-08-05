@@ -523,3 +523,115 @@ body {
 
 /* ===== Utility ===== */
 .hidden { display: none !important; }
+
+/* ===== Save tab panel ===== */
+.save-panel-content {
+  padding: 0 2px 4px;
+}
+
+.save-tab-info {
+  background: var(--muted-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.save-tab-info__title {
+  margin: 0 0 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-tab-info__url {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-tab-board {
+  margin-bottom: 10px;
+}
+
+.save-tab-board__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.save-tab-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.save-tab-status--ok {
+  background: var(--turquoise-light);
+  color: var(--turquoise);
+}
+
+.save-tab-status--warn {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.save-tab-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ===== Shortcut hint ===== */
+.shortcut-hint {
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.shortcut-hint__text {
+  margin: 0 0 8px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+/* ===== Shared button / input classes (used in save panel) ===== */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--blue-mid);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary:focus-visible { outline: 2px solid var(--blue-mid); outline-offset: 3px; }
+
+.editor-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.editor-input:focus { outline: 2px solid var(--blue-mid); outline-offset: 1px; border-color: transparent; }
+
+.editor-select { appearance: auto; cursor: pointer; }

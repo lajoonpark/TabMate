@@ -724,3 +724,164 @@ body {
     align-items: stretch;
   }
 }
+
+/* ===== Boards ===== */
+.board-list { display: flex; flex-direction: column; gap: 8px; }
+
+.board-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.board-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.board-item__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board-item__badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: var(--turquoise-light);
+  color: var(--turquoise);
+  letter-spacing: 0.03em;
+}
+
+.board-item__meta {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+/* Board tabs view */
+.board-tabs-view { }
+
+.board-tabs-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.board-tabs-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.board-tabs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.board-tabs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.board-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.board-tab-item__check { flex-shrink: 0; }
+.board-tab-item__checkbox { cursor: pointer; width: 15px; height: 15px; }
+
+.board-tab-item__favicon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  object-fit: contain;
+}
+
+.board-tab-item__favicon-placeholder {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--muted-bg);
+}
+
+.board-tab-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.board-tab-item__title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--blue-mid);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-tab-item__title:hover { text-decoration: underline; }
+
+.board-tab-item__meta {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-tab-item__delete { flex-shrink: 0; font-size: 0.75rem; padding: 4px 8px; }
+
+/* ===== Shortcuts settings ===== */
+.shortcut-commands-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shortcut-command-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.shortcut-command-row:last-child { border-bottom: none; }
+
+.shortcut-command-row__label {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.setting-card__title {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
