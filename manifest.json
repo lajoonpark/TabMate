@@ -24,5 +24,40 @@
   "background": {
     "service_worker": "background.js",
     "type": "module"
+  },
+  "commands": {
+    "organise-tabs": {
+      "suggested_key": {
+        "default": "Alt+Shift+O"
+      },
+      "description": "Organise tabs into groups"
+    },
+    "delete-duplicates": {
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
+      "description": "Delete duplicate tabs"
+    },
+    "save-current-tab": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Save current tab to default board"
+    },
+    "open-preset-1": {
+      "description": "Open preset slot 1"
+    },
+    "save-to-board-1": {
+      "description": "Save current tab to board slot 1"
+    },
+    "save-to-board-2": {
+      "description": "Save current tab to board slot 2"
+    },
+    "save-to-board-3": {
+      "description": "Save current tab to board slot 3"
+    },
+    "toggle-popups": {
+      "description": "Toggle pop-up notifications"
+    }
   }
 }

@@ -32,6 +32,18 @@
             </svg>
             Duplicate Detection
           </button>
+          <button class="sidebar__nav-item" data-section="boards" type="button">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+            </svg>
+            Boards
+          </button>
+          <button class="sidebar__nav-item" data-section="shortcuts" type="button">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+            </svg>
+            Shortcuts
+          </button>
         </nav>
       </aside>
 
@@ -224,6 +236,130 @@
             </div>
           </section>
         </div>
+
+          <!-- ===== Boards Section ===== -->
+          <section id="section-boards" class="settings-section">
+            <div class="section-header">
+              <div>
+                <h1 class="section-header__title">Boards</h1>
+                <p class="section-header__sub">
+                  Save tabs to boards like Pinterest. The "Unorganised" board is the default and cannot be deleted.
+                </p>
+              </div>
+              <button id="btn-add-board" class="btn-primary" type="button">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                </svg>
+                New Board
+              </button>
+            </div>
+
+            <!-- Board editor inline dialog -->
+            <div id="board-editor" class="category-editor hidden" role="dialog" aria-label="Edit board" aria-modal="true">
+              <h2 id="board-editor-title" class="category-editor__title">New Board</h2>
+              <div class="editor-grid">
+                <div class="editor-field">
+                  <label class="editor-label" for="board-name">Name</label>
+                  <input id="board-name" class="editor-input" type="text" maxlength="60" placeholder="e.g. Shopping" autocomplete="off" />
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label" for="board-description">Description (optional)</label>
+                  <input id="board-description" class="editor-input" type="text" maxlength="120" placeholder="What is this board for?" autocomplete="off" />
+                </div>
+              </div>
+              <div class="editor-actions">
+                <button id="btn-save-board" class="btn-primary" type="button">Save</button>
+                <button id="btn-cancel-board" class="btn-secondary" type="button">Cancel</button>
+              </div>
+            </div>
+
+            <!-- Board list -->
+            <div id="board-list" class="board-list" aria-label="Boards"></div>
+
+            <!-- Saved tabs view (shown when a board is open) -->
+            <div id="board-tabs-view" class="board-tabs-view hidden">
+              <div class="board-tabs-header">
+                <button id="btn-back-boards" class="btn-secondary" type="button">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width:14px;height:14px;"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/></svg>
+                  Back to boards
+                </button>
+                <h2 id="board-tabs-title" class="board-tabs-title"></h2>
+              </div>
+              <div class="board-tabs-toolbar">
+                <button id="btn-select-all-tabs" class="btn-secondary" type="button">Select all</button>
+                <button id="btn-deselect-all-tabs" class="btn-secondary" type="button">Deselect all</button>
+                <button id="btn-open-selected-tabs" class="btn-secondary" type="button" disabled>Open selected</button>
+                <button id="btn-open-all-tabs" class="btn-secondary" type="button">Open all</button>
+                <button id="btn-move-selected-tabs" class="btn-secondary" type="button" disabled>Move to…</button>
+                <button id="btn-delete-selected-tabs" class="btn-delete-cat btn-delete-cat--active" type="button" disabled>Delete selected</button>
+              </div>
+              <div id="board-tabs-list" class="board-tabs-list" aria-label="Saved tabs"></div>
+            </div>
+          </section>
+
+          <!-- ===== Shortcuts Section ===== -->
+          <section id="section-shortcuts" class="settings-section">
+            <div class="section-header">
+              <div>
+                <h1 class="section-header__title">Keyboard Shortcuts</h1>
+                <p class="section-header__sub">
+                  Commands are configured in your browser's extension shortcut settings. You can map command slots to specific presets and boards below.
+                </p>
+              </div>
+            </div>
+
+            <!-- Commands list -->
+            <div class="setting-card">
+              <h2 class="setting-card__title">Available Commands</h2>
+              <div id="shortcut-commands-list" class="shortcut-commands-list"></div>
+              <p class="editor-hint" style="margin-top:12px">
+                To change key bindings, open your browser's extension shortcut settings.
+              </p>
+              <button id="btn-open-shortcuts-page" class="btn-primary" type="button" style="margin-top:8px">
+                Open browser shortcut settings
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width:14px;height:14px;margin-left:4px"><path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              </button>
+            </div>
+
+            <!-- Slot assignments -->
+            <div class="setting-card" style="margin-top:16px">
+              <h2 class="setting-card__title">Command Slot Assignments</h2>
+              <p class="editor-hint">Map shortcut command slots to specific presets and boards.</p>
+
+              <div class="editor-grid" id="shortcut-slots-form">
+                <div class="editor-field">
+                  <label class="editor-label" for="slot-preset-1">Preset Slot 1 — opens which preset?</label>
+                  <select id="slot-preset-1" class="editor-input editor-select">
+                    <option value="">(none)</option>
+                  </select>
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label" for="slot-board-1">Board Slot 1 — saves to which board?</label>
+                  <select id="slot-board-1" class="editor-input editor-select">
+                    <option value="">(none)</option>
+                  </select>
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label" for="slot-board-2">Board Slot 2 — saves to which board?</label>
+                  <select id="slot-board-2" class="editor-input editor-select">
+                    <option value="">(none)</option>
+                  </select>
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label" for="slot-board-3">Board Slot 3 — saves to which board?</label>
+                  <select id="slot-board-3" class="editor-input editor-select">
+                    <option value="">(none)</option>
+                  </select>
+                </div>
+              </div>
+              <p id="shortcut-slots-status" class="setting-status hidden" aria-live="polite"></p>
+              <div class="editor-actions" style="margin-top:12px">
+                <button id="btn-save-shortcut-slots" class="btn-primary" type="button">Save assignments</button>
+              </div>
+            </div>
+          </section>
+
+      </div>
       </main>
     </div>
 
