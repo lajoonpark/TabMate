@@ -44,6 +44,12 @@
             </svg>
             Shortcuts
           </button>
+          <button class="sidebar__nav-item" data-section="notifications" type="button">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+            </svg>
+            Notifications
+          </button>
         </nav>
       </aside>
 
@@ -355,6 +361,102 @@
               <p id="shortcut-slots-status" class="setting-status hidden" aria-live="polite"></p>
               <div class="editor-actions" style="margin-top:12px">
                 <button id="btn-save-shortcut-slots" class="btn-primary" type="button">Save assignments</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== Notifications Section ===== -->
+          <section id="section-notifications" class="settings-section">
+            <div class="section-header">
+              <div>
+                <h1 class="section-header__title">Notifications</h1>
+                <p class="section-header__sub">
+                  Configure helper pop-ups that appear on web pages. You can set their position, turn them on or off individually, and set thresholds.
+                </p>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <h2 class="setting-card__title">Global Toggle</h2>
+              <div class="toggle-setting-row">
+                <label class="toggle-setting-row__label" for="notif-global-toggle">
+                  Enable all pop-up notifications
+                </label>
+                <button id="notif-global-toggle" class="toggle" role="switch" aria-checked="true" type="button" aria-label="Enable all pop-up notifications">
+                  <span class="toggle__thumb"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="setting-card" id="notif-config-card">
+              <h2 class="setting-card__title">Position</h2>
+              <div class="editor-field">
+                <label class="editor-label" for="notif-position">Pop-up corner</label>
+                <select id="notif-position" class="editor-input editor-select">
+                  <option value="bottom-left">Bottom-left (default)</option>
+                  <option value="bottom-right">Bottom-right</option>
+                  <option value="top-left">Top-left</option>
+                  <option value="top-right">Top-right</option>
+                </select>
+              </div>
+
+              <h2 class="setting-card__title" style="margin-top:20px">Pop-up Types</h2>
+
+              <div class="notif-type-row">
+                <div class="notif-type-row__info">
+                  <label class="notif-type-row__label" for="notif-new-tabs-toggle">New tabs warning</label>
+                  <p class="notif-type-row__hint">Shown when many new tabs are opened at once.</p>
+                </div>
+                <button id="notif-new-tabs-toggle" class="toggle toggle--sm" role="switch" aria-checked="true" type="button" aria-label="Enable new tabs warning">
+                  <span class="toggle__thumb"></span>
+                </button>
+              </div>
+              <div class="notif-threshold-row" id="notif-new-tabs-threshold-row">
+                <label class="editor-label" for="notif-new-tabs-threshold">Show after this many new tabs</label>
+                <input id="notif-new-tabs-threshold" class="editor-input editor-input--sm" type="number" min="2" max="50" value="8" />
+              </div>
+
+              <div class="notif-type-row">
+                <div class="notif-type-row__info">
+                  <label class="notif-type-row__label" for="notif-duplicates-toggle">Duplicate tabs warning</label>
+                  <p class="notif-type-row__hint">Shown when duplicate tabs are detected.</p>
+                </div>
+                <button id="notif-duplicates-toggle" class="toggle toggle--sm" role="switch" aria-checked="true" type="button" aria-label="Enable duplicate tabs warning">
+                  <span class="toggle__thumb"></span>
+                </button>
+              </div>
+              <div class="notif-threshold-row" id="notif-duplicates-threshold-row">
+                <label class="editor-label" for="notif-duplicates-threshold">Show after this many duplicates</label>
+                <input id="notif-duplicates-threshold" class="editor-input editor-input--sm" type="number" min="1" max="50" value="3" />
+              </div>
+
+              <div class="notif-type-row">
+                <div class="notif-type-row__info">
+                  <label class="notif-type-row__label" for="notif-many-tabs-toggle">Too many tabs warning</label>
+                  <p class="notif-type-row__hint">Shown when you have many tabs open in total.</p>
+                </div>
+                <button id="notif-many-tabs-toggle" class="toggle toggle--sm" role="switch" aria-checked="true" type="button" aria-label="Enable too many tabs warning">
+                  <span class="toggle__thumb"></span>
+                </button>
+              </div>
+              <div class="notif-threshold-row" id="notif-many-tabs-threshold-row">
+                <label class="editor-label" for="notif-many-tabs-threshold">Show when open tabs exceed</label>
+                <input id="notif-many-tabs-threshold" class="editor-input editor-input--sm" type="number" min="5" max="200" value="25" />
+              </div>
+
+              <div class="notif-type-row">
+                <div class="notif-type-row__info">
+                  <label class="notif-type-row__label" for="notif-save-confirm-toggle">Save confirmation animation</label>
+                  <p class="notif-type-row__hint">Flying bubble animation when a tab is saved to a board.</p>
+                </div>
+                <button id="notif-save-confirm-toggle" class="toggle toggle--sm" role="switch" aria-checked="true" type="button" aria-label="Enable save confirmation animation">
+                  <span class="toggle__thumb"></span>
+                </button>
+              </div>
+
+              <p id="notif-status" class="setting-status hidden" aria-live="polite"></p>
+              <div class="editor-actions" style="margin-top:16px">
+                <button id="btn-save-notif" class="btn-primary" type="button">Save notification settings</button>
               </div>
             </div>
           </section>

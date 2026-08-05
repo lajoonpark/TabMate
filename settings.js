@@ -1057,7 +1057,102 @@ async function saveShortcutSlots() {
   }
 }
 
-function initSidebarNavigation() {
+// ─── Notifications settings ───────────────────────────────────────────────────
+
+function getNotifEl(id) { return document.getElementById(id); }
+
+function setToggleState(btn, enabled) {
+  if (btn) btn.setAttribute('aria-checked', String(enabled));
+}
+
+function getToggleState(btn) {
+  return btn?.getAttribute('aria-checked') === 'true';
+}
+
+async function renderNotificationSettings() {
+  const pn = userSettings?.popupNotifications ?? {};
+
+  setToggleState(getNotifEl('notif-global-toggle'), pn.enabled ?? true);
+  updateNotifConfigVisibility(pn.enabled ?? true);
+
+  const posEl = getNotifEl('notif-position');
+  if (posEl) posEl.value = pn.position ?? 'bottom-left';
+
+  setToggleState(getNotifEl('notif-new-tabs-toggle'), pn.newTabsEnabled ?? true);
+  const newTabsThreshEl = getNotifEl('notif-new-tabs-threshold');
+  if (newTabsThreshEl) newTabsThreshEl.value = String(pn.newTabsThreshold ?? 8);
+
+  setToggleState(getNotifEl('notif-duplicates-toggle'), pn.duplicatesEnabled ?? true);
+  const dupThreshEl = getNotifEl('notif-duplicates-threshold');
+  if (dupThreshEl) dupThreshEl.value = String(pn.duplicatesThreshold ?? 3);
+
+  setToggleState(getNotifEl('notif-many-tabs-toggle'), pn.manyTabsEnabled ?? true);
+  const manyThreshEl = getNotifEl('notif-many-tabs-threshold');
+  if (manyThreshEl) manyThreshEl.value = String(pn.manyTabsThreshold ?? 25);
+
+  setToggleState(getNotifEl('notif-save-confirm-toggle'), pn.saveConfirmEnabled ?? true);
+}
+
+function updateNotifConfigVisibility(enabled) {
+  const card = getNotifEl('notif-config-card');
+  if (card) card.style.opacity = enabled ? '1' : '0.45';
+  if (card) card.style.pointerEvents = enabled ? '' : 'none';
+}
+
+async function saveNotificationSettings() {
+  const statusEl = getNotifEl('notif-status');
+  try {
+    const pn = {
+      enabled: getToggleState(getNotifEl('notif-global-toggle')),
+      position: getNotifEl('notif-position')?.value ?? 'bottom-left',
+      newTabsEnabled: getToggleState(getNotifEl('notif-new-tabs-toggle')),
+      newTabsThreshold: Math.max(2, parseInt(getNotifEl('notif-new-tabs-threshold')?.value ?? '8', 10) || 8),
+      duplicatesEnabled: getToggleState(getNotifEl('notif-duplicates-toggle')),
+      duplicatesThreshold: Math.max(1, parseInt(getNotifEl('notif-duplicates-threshold')?.value ?? '3', 10) || 3),
+      manyTabsEnabled: getToggleState(getNotifEl('notif-many-tabs-toggle')),
+      manyTabsThreshold: Math.max(5, parseInt(getNotifEl('notif-many-tabs-threshold')?.value ?? '25', 10) || 25),
+      saveConfirmEnabled: getToggleState(getNotifEl('notif-save-confirm-toggle')),
+    };
+
+    userSettings = { ...(userSettings ?? {}), popupNotifications: pn };
+    await setSettings(userSettings);
+
+    if (statusEl) {
+      statusEl.textContent = 'Notification settings saved.';
+      statusEl.classList.remove('hidden', 'setting-status--error');
+      statusEl.classList.add('setting-status--ok');
+      setTimeout(() => statusEl.classList.add('hidden'), 2500);
+    }
+  } catch (error) {
+    console.error(error);
+    if (statusEl) {
+      statusEl.textContent = 'Failed to save notification settings.';
+      statusEl.classList.remove('hidden');
+      statusEl.classList.add('setting-status--error');
+    }
+  }
+}
+
+function initNotificationSettings() {
+  const globalToggle = getNotifEl('notif-global-toggle');
+  if (globalToggle) {
+    globalToggle.addEventListener('click', () => {
+      const next = !getToggleState(globalToggle);
+      setToggleState(globalToggle, next);
+      updateNotifConfigVisibility(next);
+    });
+  }
+
+  ['notif-new-tabs-toggle', 'notif-duplicates-toggle', 'notif-many-tabs-toggle', 'notif-save-confirm-toggle'].forEach((id) => {
+    const btn = getNotifEl(id);
+    if (btn) {
+      btn.addEventListener('click', () => setToggleState(btn, !getToggleState(btn)));
+    }
+  });
+
+  const saveBtn = getNotifEl('btn-save-notif');
+  if (saveBtn) saveBtn.addEventListener('click', saveNotificationSettings);
+}
   navItems.forEach((item) => {
     item.addEventListener('click', () => {
       navItems.forEach((navItem) => navItem.classList.toggle('active', navItem === item));
@@ -1092,11 +1187,13 @@ async function init() {
     renderBoardList();
     await renderShortcutCommands();
     populateSlotSelects();
+    await renderNotificationSettings();
   } catch (error) {
     console.error('TabMate: failed to load settings', error);
   }
 
   initSidebarNavigation();
+  initNotificationSettings();
 
   btnAddCategory.addEventListener('click', () => openEditor(null));
   btnAddRule.addEventListener('click', () => {

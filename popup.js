@@ -513,9 +513,26 @@ async function doSaveTab(activeTab, boardId) {
     if (statusEl) {
       const currentBoards = await getBoards();
       const board = currentBoards.find((b) => b.id === boardId);
-      statusEl.textContent = `Saved to "${board?.name ?? 'board'}"!`;
+      const boardName = board?.name ?? 'board';
+      statusEl.textContent = `Saved to "${boardName}"!`;
       statusEl.classList.remove('hidden', 'save-tab-status--warn');
       statusEl.classList.add('save-tab-status--ok');
+
+      // Fire save animation on the active tab
+      const settings = await getSettings();
+      if (settings.popupNotifications?.enabled && settings.popupNotifications?.saveConfirmEnabled) {
+        chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+          if (tab?.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: 'show-save-animation',
+              title: activeTab.title || 'Untitled',
+              url: activeTab.url,
+              faviconUrl: activeTab.favIconUrl || undefined,
+              boardName,
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
     }
     if (saveBtn) {
       saveBtn.textContent = 'Saved!';

@@ -8,7 +8,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["tabs", "storage", "tabGroups"],
+  "permissions": ["tabs", "storage", "tabGroups", "scripting"],
   "options_ui": {
     "page": "settings.html",
     "open_in_tab": true
@@ -21,6 +21,14 @@
     },
     "default_popup": "popup.html"
   },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

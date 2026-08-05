@@ -1,0 +1,255 @@
+/* ===== TabMate content-script overlay styles ===== */
+
+/* Host element — isolated from page styles */
+#tabmate-overlay-host {
+  all: initial;
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+
+/* ─── Helper pop-up ─────────────────────────────────────────────────────────── */
+
+.tm-popup {
+  all: initial;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #0a0c14;
+  background: #ffffff;
+  border: 1px solid #d1daf0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(10,12,20,0.18), 0 2px 8px rgba(10,12,20,0.10);
+  padding: 12px 14px 10px;
+  min-width: 220px;
+  max-width: 320px;
+  pointer-events: all;
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* placement set inline via JS */
+}
+
+/* Position variants */
+.tm-popup--bottom-left  { bottom: 20px; left: 20px; }
+.tm-popup--bottom-right { bottom: 20px; right: 20px; }
+.tm-popup--top-left     { top: 20px;    left: 20px; }
+.tm-popup--top-right    { top: 20px;    right: 20px; }
+
+/* Open animation — slide + fade */
+@keyframes tm-slide-in-bl {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+@keyframes tm-slide-in-br {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+@keyframes tm-slide-in-tl {
+  from { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);    }
+}
+@keyframes tm-slide-in-tr {
+  from { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);    }
+}
+
+.tm-popup--bottom-left.tm-popup--entering  { animation: tm-slide-in-bl 0.22s cubic-bezier(.22,.68,0,1.2) forwards; }
+.tm-popup--bottom-right.tm-popup--entering { animation: tm-slide-in-br 0.22s cubic-bezier(.22,.68,0,1.2) forwards; }
+.tm-popup--top-left.tm-popup--entering     { animation: tm-slide-in-tl 0.22s cubic-bezier(.22,.68,0,1.2) forwards; }
+.tm-popup--top-right.tm-popup--entering    { animation: tm-slide-in-tr 0.22s cubic-bezier(.22,.68,0,1.2) forwards; }
+
+/* Close animation */
+@keyframes tm-fade-out {
+  from { opacity: 1; transform: scale(1);    }
+  to   { opacity: 0; transform: scale(0.92); }
+}
+.tm-popup--leaving { animation: tm-fade-out 0.18s ease-in forwards; }
+
+/* Inner layout */
+.tm-popup__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tm-popup__icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tm-popup__icon svg {
+  width: 16px;
+  height: 16px;
+  color: #1a4bbf;
+  fill: currentColor;
+}
+.tm-popup__icon--danger { background: #fee2e2; }
+.tm-popup__icon--danger svg { color: #dc2626; }
+.tm-popup__icon--success { background: #d1fae5; }
+.tm-popup__icon--success svg { color: #059669; }
+
+.tm-popup__text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0a0c14;
+}
+
+.tm-popup__actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.tm-popup__btn {
+  all: initial;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  pointer-events: all;
+  transition: background 0.12s, transform 0.08s;
+}
+.tm-popup__btn:active { transform: scale(0.96); }
+
+.tm-popup__btn--primary {
+  background: #1a4bbf;
+  color: #fff;
+}
+.tm-popup__btn--primary:hover { background: #2563eb; }
+
+.tm-popup__btn--secondary {
+  background: #e8ecf5;
+  color: #0a0c14;
+}
+.tm-popup__btn--secondary:hover { background: #d1daf0; }
+
+/* ─── Save animation overlay ────────────────────────────────────────────────── */
+
+.tm-save-anim {
+  all: initial;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  pointer-events: none;
+  position: fixed;
+  z-index: 2147483647;
+  /* start position set by JS */
+}
+
+.tm-save-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1.5px solid #d1daf0;
+  border-radius: 20px;
+  padding: 6px 12px 6px 8px;
+  box-shadow: 0 4px 16px rgba(10,12,20,0.15);
+  font-size: 12px;
+  font-weight: 500;
+  color: #0a0c14;
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-save-bubble__favicon {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.tm-save-bubble__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fly animation — bubble travels toward top-right and shrinks away */
+@keyframes tm-fly {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  60%  { opacity: 0.9; }
+  100% { opacity: 0; transform: var(--tm-fly-to) scale(0.3); }
+}
+
+.tm-save-anim--flying {
+  animation: tm-fly 0.72s cubic-bezier(.4,0,.2,1) forwards;
+}
+
+/* Confirmation toast that appears at destination */
+.tm-save-confirm {
+  all: initial;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #059669;
+  border-radius: 20px;
+  padding: 5px 14px;
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(5,150,105,0.35);
+  top: 20px;
+  right: 20px;
+}
+
+@keyframes tm-confirm-in {
+  0%   { opacity: 0; transform: scale(0.7); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes tm-confirm-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.8) translateY(-8px); }
+}
+.tm-save-confirm--in  { animation: tm-confirm-in  0.28s cubic-bezier(.22,.68,0,1.4) forwards; }
+.tm-save-confirm--out { animation: tm-confirm-out 0.22s ease-in forwards; }
+
+/* ─── Sparkle particles ─────────────────────────────────────────────────────── */
+
+.tm-particle {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2147483647;
+}
+
+@keyframes tm-particle-fly {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: var(--tm-p-to) scale(0); }
+}
+
+.tm-particle--anim {
+  animation: tm-particle-fly var(--tm-p-dur, 0.6s) ease-out forwards;
+}
+
+/* ─── Reduced motion overrides ──────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-popup--entering,
+  .tm-popup--leaving,
+  .tm-save-anim--flying,
+  .tm-save-confirm--in,
+  .tm-save-confirm--out,
+  .tm-particle--anim {
+    animation: none !important;
+    transition: none !important;
+  }
+  .tm-popup--leaving,
+  .tm-save-anim--flying,
+  .tm-particle--anim { opacity: 0; }
+}
