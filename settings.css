@@ -885,3 +885,97 @@ body {
   font-size: 0.9rem;
   font-weight: 700;
 }
+
+/* ===== Notifications settings ===== */
+.toggle-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+.toggle-setting-row__label {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.notif-type-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--border);
+}
+.notif-type-row:first-of-type { border-top: none; }
+.notif-type-row__info { flex: 1; }
+.notif-type-row__label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.notif-type-row__hint {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.notif-threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 10px 0;
+}
+.notif-threshold-row .editor-label {
+  flex: 1;
+  font-size: 0.8rem;
+}
+.editor-input--sm {
+  width: 72px;
+  text-align: center;
+}
+
+.toggle--sm {
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.toggle--sm .toggle__thumb {
+  width: 14px;
+  height: 14px;
+  top: 3px;
+  left: 3px;
+}
+.toggle--sm[aria-checked="true"] .toggle__thumb {
+  transform: translateX(16px);
+}
+
+/* ===== Toggle component (shared with popup) ===== */
+.toggle {
+  all: unset;
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  background: var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background 0.18s;
+  flex-shrink: 0;
+}
+.toggle[aria-checked="true"]  { background: #0d9488; }
+.toggle:focus-visible { outline: 2px solid #0d9488; outline-offset: 2px; }
+.toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  transition: transform 0.18s cubic-bezier(.22,.68,0,1.2);
+}
+.toggle[aria-checked="true"] .toggle__thumb { transform: translateX(18px); }
