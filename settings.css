@@ -725,6 +725,17 @@ body {
   }
 }
 
+/* ===== AI Categorization ===== */
+.ai-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ai-key-row .editor-input {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ===== Boards ===== */
 .board-list { display: flex; flex-direction: column; gap: 8px; }
 

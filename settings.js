@@ -1,6 +1,10 @@
 import {
-  getCategories,
-  setCategories,
+  getAiConfig,
+  setAiConfig,
+  getAiMemory,
+  setAiMemory,
+  clearAiAssignments,
+  resetAiMemory,
   getPresets,
   setPresets,
   getSettings,
@@ -12,13 +16,15 @@ import {
 } from './lib/storage.js';
 import {
   CATEGORY_COLOURS,
-  matchTabToCategory,
   escapeHtml,
   isInternalUrl,
 } from './lib/utils.js';
+import { AI_MODELS } from './lib/defaults.js';
 
-/** @type {import('./lib/defaults.js').Category[]} */
-let categories = [];
+/** @type {import('./lib/defaults.js').AiConfig | null} */
+let aiConfig = null;
+/** @type {import('./lib/defaults.js').AiMemory | null} */
+let aiMemory = null;
 /** @type {import('./lib/defaults.js').Preset[]} */
 let presets = [];
 /** @type {import('./lib/defaults.js').Settings | null} */
@@ -30,31 +36,39 @@ let savedTabs = [];
 /** Currently open board id for the tabs view, or null */
 let openBoardId = null;
 
-let editingId = null;
-let draftRules = [];
+/** Name of the learned category currently being edited, or null */
+let editingAiCategoryName = null;
+/** Models fetched from OpenRouter (merged into the dropdown on top of AI_MODELS) */
+let loadedModels = [];
 let editingPresetId = null;
 let draftPresetTabs = [];
 let editingBoardId = null;
 
 const navItems = Array.from(document.querySelectorAll('.sidebar__nav-item'));
 
+// ─── AI Categorization elements ───────────────────────────────────────────────
+const aiApiKeyEl = document.getElementById('ai-api-key');
+const btnToggleKey = document.getElementById('btn-toggle-key');
+const btnSaveKey = document.getElementById('btn-save-key');
+const aiKeyStatusEl = document.getElementById('ai-key-status');
+const aiModelEl = document.getElementById('ai-model');
+const aiCustomModelFieldEl = document.getElementById('ai-custom-model-field');
+const aiCustomModelEl = document.getElementById('ai-custom-model');
+const btnLoadModels = document.getElementById('btn-load-models');
+const btnTestConnection = document.getElementById('btn-test-connection');
+const aiModelStatusEl = document.getElementById('ai-model-status');
+const aiMemorySummaryEl = document.getElementById('ai-memory-summary');
+const btnClearMemory = document.getElementById('btn-clear-ai-memory');
+const btnRecategorizeNext = document.getElementById('btn-recategorize-all');
+const aiMemoryStatusEl = document.getElementById('ai-memory-status');
+
 const categoryListEl = document.getElementById('category-list');
 const editorEl = document.getElementById('category-editor');
 const editorTitleEl = document.getElementById('editor-title');
 const editorNameEl = document.getElementById('editor-name');
 const colourPickerEl = document.getElementById('colour-picker');
-const rulesListEl = document.getElementById('rules-list');
-const rulesEmptyEl = document.getElementById('rules-empty');
-const btnAddCategory = document.getElementById('btn-add-category');
-const btnAddRule = document.getElementById('btn-add-rule');
 const btnSaveCategory = document.getElementById('btn-save-category');
 const btnCancelEditor = document.getElementById('btn-cancel-editor');
-const previewUrlEl = document.getElementById('preview-url');
-const previewTitleEl = document.getElementById('preview-title');
-const btnPreview = document.getElementById('btn-preview');
-const previewResultEl = document.getElementById('preview-result');
-const previewDotEl = document.getElementById('preview-dot');
-const previewMatchEl = document.getElementById('preview-match');
 
 const presetListEl = document.getElementById('preset-list');
 const presetEditorEl = document.getElementById('preset-editor');
@@ -106,13 +120,6 @@ const shortcutSlotStatusEl = document.getElementById('shortcut-slots-status');
 const btnSaveShortcutSlots = document.getElementById('btn-save-shortcut-slots');
 const btnOpenShortcutsPage = document.getElementById('btn-open-shortcuts-page');
 
-const RULE_TYPE_LABELS = {
-  exactDomain: 'Exact domain',
-  domainContains: 'Domain contains',
-  urlContains: 'URL contains',
-  titleContains: 'Title contains',
-};
-
 function colourHex(colour) {
   return CATEGORY_COLOURS.find((item) => item.value === colour)?.hex ?? '#9ca3af';
 }
@@ -124,21 +131,6 @@ function generateId(idPrefix) {
 function getSelectedColour() {
   const checked = colourPickerEl.querySelector('input[name="colour"]:checked');
   return checked ? checked.value : 'grey';
-}
-
-function placeholderFor(type) {
-  switch (type) {
-    case 'exactDomain':
-      return 'e.g. app.slack.com';
-    case 'domainContains':
-      return 'e.g. slack.com';
-    case 'urlContains':
-      return 'e.g. /workspace/';
-    case 'titleContains':
-      return 'e.g. Dashboard';
-    default:
-      return '';
-  }
 }
 
 function validateUrl(url) {
@@ -183,179 +175,246 @@ function renderColourPicker(selectedColour) {
   }
 }
 
-function renderRules() {
-  rulesListEl.innerHTML = '';
+// ─── AI Categorization ────────────────────────────────────────────────────────
 
-  if (draftRules.length === 0) {
-    rulesEmptyEl.classList.remove('hidden');
-    return;
-  }
-  rulesEmptyEl.classList.add('hidden');
-
-  draftRules.forEach((rule, index) => {
-    const row = document.createElement('div');
-    row.className = 'rule-row';
-
-    const typeSelect = document.createElement('select');
-    typeSelect.className = 'rule-row__type';
-    typeSelect.setAttribute('aria-label', 'Rule type');
-
-    for (const [value, label] of Object.entries(RULE_TYPE_LABELS)) {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = label;
-      option.selected = value === rule.type;
-      typeSelect.appendChild(option);
-    }
-
-    typeSelect.addEventListener('change', () => {
-      draftRules[index] = { ...draftRules[index], type: typeSelect.value };
-      valueInput.placeholder = placeholderFor(typeSelect.value);
-    });
-
-    const valueInput = document.createElement('input');
-    valueInput.type = 'text';
-    valueInput.className = 'rule-row__value';
-    valueInput.value = rule.value;
-    valueInput.placeholder = placeholderFor(rule.type);
-    valueInput.setAttribute('aria-label', 'Rule value');
-    valueInput.autocomplete = 'off';
-    valueInput.addEventListener('input', () => {
-      draftRules[index] = { ...draftRules[index], value: valueInput.value };
-    });
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'rule-row__remove';
-    removeBtn.setAttribute('aria-label', 'Remove rule');
-    removeBtn.innerHTML = `
-      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-      </svg>`;
-    removeBtn.addEventListener('click', () => {
-      draftRules.splice(index, 1);
-      renderRules();
-    });
-
-    row.appendChild(typeSelect);
-    row.appendChild(valueInput);
-    row.appendChild(removeBtn);
-    rulesListEl.appendChild(row);
-  });
+function showKeyStatus(message, isError = false) {
+  aiKeyStatusEl.textContent = message;
+  aiKeyStatusEl.classList.remove('hidden', 'setting-status--error');
+  if (isError) aiKeyStatusEl.classList.add('setting-status--error');
 }
 
-function renderCategoryList() {
+function showModelStatus(message, isError = false) {
+  aiModelStatusEl.textContent = message;
+  aiModelStatusEl.classList.remove('hidden', 'setting-status--error');
+  if (isError) aiModelStatusEl.classList.add('setting-status--error');
+}
+
+function showMemoryStatus(message, isError = false) {
+  aiMemoryStatusEl.textContent = message;
+  aiMemoryStatusEl.classList.remove('hidden', 'setting-status--error');
+  if (isError) aiMemoryStatusEl.classList.add('setting-status--error');
+}
+
+function renderMemorySummary() {
+  const siteCount = Object.keys(aiMemory?.assignments ?? {}).length;
+  const categoryCount = (aiMemory?.categories ?? []).length;
+  aiMemorySummaryEl.textContent = `${siteCount} site${siteCount === 1 ? '' : 's'} remembered · ${categoryCount} categor${categoryCount === 1 ? 'y' : 'ies'}`;
+}
+
+function populateModelSelect() {
+  const options = [...AI_MODELS];
+  for (const model of loadedModels) {
+    if (!options.some((option) => option.id === model.id)) {
+      options.push({ id: model.id, label: model.id });
+    }
+  }
+  const savedModel = aiConfig?.model;
+  if (savedModel && savedModel !== 'custom' && !options.some((option) => option.id === savedModel)) {
+    options.push({ id: savedModel, label: savedModel });
+  }
+  options.push({ id: 'custom', label: 'Custom model id' });
+
+  aiModelEl.innerHTML = '';
+  for (const option of options) {
+    const el = document.createElement('option');
+    el.value = option.id;
+    el.textContent = option.label;
+    aiModelEl.appendChild(el);
+  }
+
+  aiModelEl.value = savedModel && options.some((option) => option.id === savedModel)
+    ? savedModel
+    : AI_MODELS[0].id;
+  aiCustomModelEl.value = aiConfig?.customModel ?? '';
+  updateCustomModelVisibility();
+}
+
+function updateCustomModelVisibility() {
+  const showCustom = aiModelEl.value === 'custom';
+  aiCustomModelFieldEl.classList.toggle('hidden', !showCustom);
+}
+
+async function persistModelSelection() {
+  aiConfig = {
+    ...(aiConfig ?? {}),
+    model: aiModelEl.value,
+    customModel: aiCustomModelEl.value.trim(),
+  };
+  try {
+    await setAiConfig(aiConfig);
+    showModelStatus('Model saved.', false);
+  } catch (error) {
+    console.error(error);
+    showModelStatus('Failed to save the model.', true);
+  }
+}
+
+async function saveAiKey() {
+  const apiKey = aiApiKeyEl.value.trim();
+  if (!apiKey) {
+    showKeyStatus('Paste your OpenRouter API key first.', true);
+    return;
+  }
+  try {
+    aiConfig = { ...(aiConfig ?? {}), apiKey };
+    await setAiConfig(aiConfig);
+    showKeyStatus('API key saved.', false);
+  } catch (error) {
+    console.error(error);
+    showKeyStatus('Failed to save the API key.', true);
+  }
+}
+
+async function ensureKeySaved() {
+  const typed = aiApiKeyEl.value.trim();
+  if (typed && typed !== aiConfig?.apiKey) {
+    await saveAiKey();
+  }
+  return Boolean(aiConfig?.apiKey);
+}
+
+async function testConnection() {
+  btnTestConnection.disabled = true;
+  showModelStatus('Testing…', false);
+  try {
+    const hasKey = await ensureKeySaved();
+    if (!hasKey) {
+      showModelStatus('Save an API key first.', true);
+      return;
+    }
+    const response = await chrome.runtime.sendMessage({ type: 'test-openrouter' });
+    if (response?.ok) {
+      showModelStatus('Connection works.', false);
+    } else {
+      showModelStatus(response?.error || 'Connection failed.', true);
+    }
+  } catch (error) {
+    console.error(error);
+    showModelStatus(error?.message || 'Connection failed.', true);
+  } finally {
+    btnTestConnection.disabled = false;
+  }
+}
+
+async function loadModels() {
+  btnLoadModels.disabled = true;
+  showModelStatus('Loading models…', false);
+  try {
+    const hasKey = await ensureKeySaved();
+    if (!hasKey) {
+      showModelStatus('Save an API key first.', true);
+      return;
+    }
+    const response = await chrome.runtime.sendMessage({ type: 'load-openrouter-models' });
+    if (response?.ok && Array.isArray(response.models)) {
+      loadedModels = response.models;
+      populateModelSelect();
+      showModelStatus(`${loadedModels.length} models loaded.`, false);
+    } else {
+      loadedModels = [];
+      populateModelSelect();
+      showModelStatus(response?.error || 'Could not load models. Showing the curated list.', true);
+    }
+  } catch (error) {
+    console.error(error);
+    loadedModels = [];
+    populateModelSelect();
+    showModelStatus(error?.message || 'Could not load models.', true);
+  } finally {
+    btnLoadModels.disabled = false;
+  }
+}
+
+async function clearAiMemory() {
+  if (!window.confirm('Clear all learned categories and site assignments?')) return;
+  try {
+    await resetAiMemory();
+    aiMemory = { categories: [], assignments: {} };
+    renderLearnedCategories();
+    renderMemorySummary();
+    showMemoryStatus('Memory cleared.', false);
+  } catch (error) {
+    console.error(error);
+    showMemoryStatus('Failed to clear memory.', true);
+  }
+}
+
+async function recategorizeNextRun() {
+  if (
+    !window.confirm(
+      'Forget every site assignment? The next Organise/Categorize run will re-categorise all open tabs, keeping the learned category names.'
+    )
+  ) {
+    return;
+  }
+  try {
+    await clearAiAssignments();
+    aiMemory = await getAiMemory();
+    renderLearnedCategories();
+    renderMemorySummary();
+    showMemoryStatus('Ready to re-categorise on the next run.', false);
+  } catch (error) {
+    console.error(error);
+    showMemoryStatus('Failed to clear assignments.', true);
+  }
+}
+
+function renderLearnedCategories() {
   categoryListEl.innerHTML = '';
 
-  if (categories.length === 0) {
-    categoryListEl.innerHTML = '<p class="list-empty">No categories yet.</p>';
+  const counts = new Map();
+  for (const assignment of Object.values(aiMemory?.assignments ?? {})) {
+    counts.set(assignment.categoryName, (counts.get(assignment.categoryName) ?? 0) + 1);
+  }
+
+  if ((aiMemory?.categories ?? []).length === 0) {
+    categoryListEl.innerHTML =
+      '<p class="list-empty">No categories learned yet. Add an API key and run Organise Tabs.</p>';
     return;
   }
 
-  categories.forEach((category, index) => {
-    const isFirst = index === 0;
-    const isOther = category.id === 'other';
-    const otherIsLast = categories[categories.length - 1]?.id === 'other';
-    const canMoveDown =
-      !isOther && index < categories.length - 1 && !(otherIsLast && index === categories.length - 2);
-    const canMoveUp = !isFirst && !isOther;
-    const ruleCount = (category.rules ?? []).length;
-    const ruleCountLabel = ruleCount === 0 ? 'No' : String(ruleCount);
-
+  for (const category of aiMemory.categories) {
+    const count = counts.get(category.name) ?? 0;
     const item = document.createElement('div');
     item.className = 'cat-item';
     item.innerHTML = `
-      <div class="cat-item__reorder">
-        <button class="reorder-btn" type="button" aria-label="Move ${escapeHtml(category.name)} up" ${canMoveUp ? '' : 'disabled'} data-action="up" data-id="${escapeHtml(category.id)}">
-          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd"/></svg>
-        </button>
-        <button class="reorder-btn" type="button" aria-label="Move ${escapeHtml(category.name)} down" ${canMoveDown ? '' : 'disabled'} data-action="down" data-id="${escapeHtml(category.id)}">
-          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-        </button>
-      </div>
       <span class="cat-item__colour" style="background:${escapeHtml(colourHex(category.colour ?? 'grey'))}" aria-hidden="true"></span>
       <div class="cat-item__info">
         <span class="cat-item__name">${escapeHtml(category.name)}</span>
-        <span class="cat-item__rules">${ruleCountLabel} ${ruleCount === 1 ? 'rule' : 'rules'}${category.undeletable ? ' · fallback' : ''}</span>
+        <span class="cat-item__rules">${count} site${count === 1 ? '' : 's'} assigned</span>
       </div>
       <div class="cat-item__actions">
-        <button class="btn-edit-cat" type="button" data-id="${escapeHtml(category.id)}">Edit</button>
-        ${
-          category.undeletable
-            ? '<button class="btn-delete-cat" type="button" disabled>Delete</button>'
-            : `<button class="btn-delete-cat btn-delete-cat--active" type="button" data-id="${escapeHtml(category.id)}">Delete</button>`
-        }
+        <button class="btn-edit-cat" type="button" data-name="${escapeHtml(category.name)}">Edit</button>
+        <button class="btn-delete-cat btn-delete-cat--active" type="button" data-name="${escapeHtml(category.name)}">Delete</button>
       </div>
     `;
-
     categoryListEl.appendChild(item);
-  });
+  }
 
-  categoryListEl.querySelectorAll('.reorder-btn').forEach((button) => {
-    button.addEventListener('click', () => reorderCategory(button.dataset.id, button.dataset.action));
-  });
   categoryListEl.querySelectorAll('.btn-edit-cat').forEach((button) => {
-    button.addEventListener('click', () => openEditor(button.dataset.id));
+    button.addEventListener('click', () => openCategoryEditor(button.dataset.name));
   });
   categoryListEl.querySelectorAll('.btn-delete-cat--active').forEach((button) => {
-    button.addEventListener('click', () => deleteCategory(button.dataset.id));
+    button.addEventListener('click', () => deleteCategory(button.dataset.name));
   });
 }
 
-async function reorderCategory(id, direction) {
-  const index = categories.findIndex((category) => category.id === id);
-  if (index === -1) return;
+function openCategoryEditor(name) {
+  const category = aiMemory.categories.find((item) => item.name === name);
+  if (!category) return;
 
-  const otherIndex = categories.findIndex((category) => category.id === 'other');
-
-  if (direction === 'up' && index > 0) {
-    [categories[index - 1], categories[index]] = [categories[index], categories[index - 1]];
-  } else if (direction === 'down' && index < categories.length - 1) {
-    if (id === 'other') return;
-    if (otherIndex !== -1 && index + 1 === otherIndex) return;
-    [categories[index + 1], categories[index]] = [categories[index], categories[index + 1]];
-  }
-
-  categories.forEach((category, categoryIndex) => {
-    category.priority = category.id === 'other' ? 999 : (categoryIndex + 1) * 10;
-  });
-
-  await persistCategories();
-  renderCategoryList();
-}
-
-async function deleteCategory(id) {
-  const category = categories.find((item) => item.id === id);
-  if (!category || category.undeletable) return;
-
-  if (!window.confirm(`Delete the "${category.name}" category? Tabs that matched it will fall through to "Other".`)) {
-    return;
-  }
-
-  categories = categories.filter((item) => item.id !== id);
-  await persistCategories();
-  renderCategoryList();
-}
-
-function openEditor(id) {
-  const category = id ? categories.find((item) => item.id === id) : null;
-  editingId = id ?? null;
-  draftRules = category ? (category.rules ?? []).map((rule) => ({ ...rule })) : [];
-
-  editorTitleEl.textContent = category ? `Edit "${category.name}"` : 'New Category';
-  editorNameEl.value = category?.name ?? '';
-
-  renderColourPicker(category?.colour ?? 'blue');
-  renderRules();
+  editingAiCategoryName = name;
+  editorTitleEl.textContent = `Edit "${category.name}"`;
+  editorNameEl.value = category.name;
+  renderColourPicker(category.colour ?? 'grey');
   editorEl.classList.remove('hidden');
   editorNameEl.focus();
   editorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function closeEditor() {
+function closeCategoryEditor() {
   editorEl.classList.add('hidden');
-  editingId = null;
-  draftRules = [];
+  editingAiCategoryName = null;
 }
 
 async function saveCategory() {
@@ -368,67 +427,80 @@ async function saveCategory() {
   }
   editorNameEl.setCustomValidity('');
 
-  const rules = draftRules.filter((rule) => rule.value.trim() !== '');
+  const oldName = editingAiCategoryName;
+  if (!oldName) return;
+
   const colour = getSelectedColour();
-
-  if (editingId) {
-    const index = categories.findIndex((category) => category.id === editingId);
-    if (index !== -1) categories[index] = { ...categories[index], name, colour, rules };
-  } else {
-    const otherIndex = categories.findIndex((category) => category.id === 'other');
-    const insertAt = otherIndex !== -1 ? otherIndex : categories.length;
-    categories.splice(insertAt, 0, {
-      id: generateId('cat'),
-      name,
-      colour,
-      builtin: false,
-      undeletable: false,
-      priority: insertAt * 10,
-      rules,
-    });
-  }
-
-  categories.forEach((category, index) => {
-    category.priority = category.id === 'other' ? 999 : (index + 1) * 10;
-  });
-
-  await persistCategories();
-  closeEditor();
-  renderCategoryList();
-}
-
-async function persistCategories() {
-  try {
-    await setCategories(categories);
-  } catch (error) {
-    console.error('TabMate: failed to save categories', error);
-    window.alert('Failed to save categories. Please try again.');
-  }
-}
-
-function runPreview() {
-  const rawUrl = previewUrlEl.value.trim();
-  const rawTitle = previewTitleEl.value.trim();
-
-  if (!rawUrl && !rawTitle) {
-    previewResultEl.classList.add('hidden');
+  const categories = [...aiMemory.categories];
+  const index = categories.findIndex((category) => category.name === oldName);
+  if (index === -1) {
+    closeCategoryEditor();
     return;
   }
 
-  const fakeTab = {
-    url: rawUrl || undefined,
-    title: rawTitle || undefined,
+  const collisionIndex = categories.findIndex(
+    (category) => category.name.toLowerCase() === name.toLowerCase() && category.name !== oldName
+  );
+  const targetName = collisionIndex !== -1 ? categories[collisionIndex].name : name;
+  const targetColour = collisionIndex !== -1 ? categories[collisionIndex].colour : colour;
+
+  if (collisionIndex !== -1) {
+    // Merging into an existing category: drop the old entry.
+    categories.splice(index, 1);
+  } else {
+    categories[index] = { ...categories[index], name, colour };
+  }
+
+  const assignments = {};
+  for (const [key, assignment] of Object.entries(aiMemory.assignments)) {
+    assignments[key] =
+      assignment.categoryName === oldName
+        ? { ...assignment, categoryName: targetName, colour: targetColour }
+        : assignment;
+  }
+
+  aiMemory = { categories, assignments };
+  await persistAiMemory();
+  closeCategoryEditor();
+  renderLearnedCategories();
+  renderMemorySummary();
+}
+
+async function deleteCategory(name) {
+  const category = aiMemory.categories.find((item) => item.name === name);
+  if (!category) return;
+
+  if (
+    !window.confirm(
+      `Delete the "${category.name}" category? Its sites will be re-categorised on the next run.`
+    )
+  ) {
+    return;
+  }
+
+  const assignments = {};
+  for (const [key, assignment] of Object.entries(aiMemory.assignments)) {
+    if (assignment.categoryName === name) continue;
+    assignments[key] = assignment;
+  }
+
+  aiMemory = {
+    categories: aiMemory.categories.filter((item) => item.name !== name),
+    assignments,
   };
+  await persistAiMemory();
+  renderLearnedCategories();
+  renderMemorySummary();
+}
 
-  const sorted = [...categories]
-    .filter((category) => category.id !== 'other')
-    .sort((a, b) => (a.priority ?? 500) - (b.priority ?? 500));
-  const otherCategory = categories.find((category) => category.id === 'other');
-  const matched = sorted.find((category) => matchTabToCategory(fakeTab, category)) ?? otherCategory ?? null;
-
-  previewMatchEl.textContent = matched ? matched.name : 'No match';
-  previewDotEl.style.background = colourHex(matched?.colour ?? 'grey');
-  previewResultEl.classList.remove('hidden');
+async function persistAiMemory() {
+  try {
+    await setAiMemory(aiMemory);
+    showMemoryStatus('Memory updated.', false);
+  } catch (error) {
+    console.error('TabMate: failed to save AI memory', error);
+    showMemoryStatus('Failed to save memory.', true);
+  }
 }
 
 function renderPresetList() {
@@ -1153,6 +1225,7 @@ function initNotificationSettings() {
   const saveBtn = getNotifEl('btn-save-notif');
   if (saveBtn) saveBtn.addEventListener('click', saveNotificationSettings);
 }
+function initSidebarNavigation() {
   navItems.forEach((item) => {
     item.addEventListener('click', () => {
       navItems.forEach((navItem) => navItem.classList.toggle('active', navItem === item));
@@ -1166,22 +1239,19 @@ function initNotificationSettings() {
 
 async function init() {
   try {
-    [categories, presets, userSettings, boards, savedTabs] = await Promise.all([
-      getCategories(),
+    [aiConfig, aiMemory, presets, userSettings, boards, savedTabs] = await Promise.all([
+      getAiConfig(),
+      getAiMemory(),
       getPresets(),
       getSettings(),
       getBoards(),
       getSavedTabs(),
     ]);
 
-    const otherIndex = categories.findIndex((category) => category.id === 'other');
-    if (otherIndex !== -1 && otherIndex !== categories.length - 1) {
-      const [other] = categories.splice(otherIndex, 1);
-      categories.push(other);
-      await persistCategories();
-    }
-
-    renderCategoryList();
+    aiApiKeyEl.value = aiConfig.apiKey || '';
+    populateModelSelect();
+    renderMemorySummary();
+    renderLearnedCategories();
     renderPresetList();
     renderDuplicateSettings();
     renderBoardList();
@@ -1195,23 +1265,23 @@ async function init() {
   initSidebarNavigation();
   initNotificationSettings();
 
-  btnAddCategory.addEventListener('click', () => openEditor(null));
-  btnAddRule.addEventListener('click', () => {
-    draftRules.push({ type: 'domainContains', value: '' });
-    renderRules();
-    const inputs = rulesListEl.querySelectorAll('.rule-row__value');
-    if (inputs.length > 0) inputs[inputs.length - 1].focus();
+  btnToggleKey.addEventListener('click', () => {
+    const isPassword = aiApiKeyEl.type === 'password';
+    aiApiKeyEl.type = isPassword ? 'text' : 'password';
+    btnToggleKey.textContent = isPassword ? 'Hide' : 'Show';
   });
+  btnSaveKey.addEventListener('click', saveAiKey);
+  aiModelEl.addEventListener('change', () => {
+    updateCustomModelVisibility();
+    persistModelSelection();
+  });
+  aiCustomModelEl.addEventListener('change', persistModelSelection);
+  btnLoadModels.addEventListener('click', loadModels);
+  btnTestConnection.addEventListener('click', testConnection);
+  btnClearMemory.addEventListener('click', clearAiMemory);
+  btnRecategorizeNext.addEventListener('click', recategorizeNextRun);
   btnSaveCategory.addEventListener('click', saveCategory);
-  btnCancelEditor.addEventListener('click', closeEditor);
-
-  btnPreview.addEventListener('click', runPreview);
-  previewUrlEl.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') runPreview();
-  });
-  previewTitleEl.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') runPreview();
-  });
+  btnCancelEditor.addEventListener('click', closeCategoryEditor);
 
   btnAddPreset.addEventListener('click', () => openPresetEditor(null));
   btnAddPresetTab.addEventListener('click', () => addDraftPresetTab());

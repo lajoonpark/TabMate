@@ -9,6 +9,7 @@
     "128": "icons/icon128.png"
   },
   "permissions": ["tabs", "storage", "tabGroups", "scripting"],
+  "host_permissions": ["https://openrouter.ai/*"],
   "options_ui": {
     "page": "settings.html",
     "open_in_tab": true

@@ -18,7 +18,7 @@
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
             </svg>
-            Categories
+            AI Categorization
           </button>
           <button class="sidebar__nav-item" data-section="presets" type="button">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -58,84 +58,105 @@
           <section id="section-categories" class="settings-section">
             <div class="section-header">
               <div>
-                <h1 class="section-header__title">Categories</h1>
+                <h1 class="section-header__title">AI Categorization</h1>
                 <p class="section-header__sub">
-                  Use the ▲ ▼ buttons to reorder. Tabs are matched from top to bottom — the first matching category wins.
+                  TabMate sends open tab titles and URLs to OpenRouter, which invents category
+                  names and remembers which sites belong where. The API key and learned memory
+                  stay in this browser only.
                 </p>
               </div>
-              <button id="btn-add-category" class="btn-primary" type="button">
-                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
-                </svg>
-                Add Category
-              </button>
             </div>
 
-            <div id="category-editor" class="category-editor hidden" role="dialog" aria-label="Edit category" aria-modal="true">
-              <h2 id="editor-title" class="category-editor__title">New Category</h2>
-
-              <div class="editor-field">
-                <label class="editor-label" for="editor-name">Name</label>
+            <div class="setting-card">
+              <h2 class="setting-card__title">OpenRouter API Key</h2>
+              <p class="editor-hint">Create a key at <strong>openrouter.ai/keys</strong>. It is stored locally and never sent anywhere except OpenRouter.</p>
+              <div class="ai-key-row">
                 <input
-                  id="editor-name"
+                  id="ai-api-key"
+                  class="editor-input"
+                  type="password"
+                  placeholder="sk-or-v1-…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button id="btn-toggle-key" class="btn-secondary" type="button">Show</button>
+                <button id="btn-save-key" class="btn-primary" type="button">Save key</button>
+              </div>
+              <p id="ai-key-status" class="setting-status hidden" aria-live="polite"></p>
+            </div>
+
+            <div class="setting-card">
+              <h2 class="setting-card__title">Model</h2>
+              <div class="editor-field">
+                <label class="editor-label" for="ai-model">Categorisation model</label>
+                <select id="ai-model" class="editor-input editor-select"></select>
+              </div>
+              <div class="editor-field hidden" id="ai-custom-model-field">
+                <label class="editor-label" for="ai-custom-model">Custom model id</label>
+                <input
+                  id="ai-custom-model"
                   class="editor-input"
                   type="text"
-                  placeholder="e.g. Finance"
-                  maxlength="40"
+                  placeholder="e.g. openai/gpt-4o"
                   autocomplete="off"
+                  spellcheck="false"
                 />
               </div>
-
-              <div class="editor-field">
-                <span class="editor-label">Colour</span>
-                <div id="colour-picker" class="colour-picker" role="radiogroup" aria-label="Category colour"></div>
-              </div>
-
-              <div class="editor-field">
-                <div class="rules-header">
-                  <span class="editor-label">Matching Rules</span>
-                  <button id="btn-add-rule" class="btn-link" type="button">+ Add rule</button>
-                </div>
-                <p class="editor-hint">
-                  Tabs are matched against rules in order. A tab matches if <em>any</em> rule passes.
-                </p>
-                <div id="rules-list" class="rules-list" aria-label="Matching rules"></div>
-                <p id="rules-empty" class="rules-empty hidden">No rules yet — this category won't match any tabs automatically.</p>
-              </div>
-
               <div class="editor-actions">
-                <button id="btn-save-category" class="btn-primary" type="button">Save</button>
-                <button id="btn-cancel-editor" class="btn-secondary" type="button">Cancel</button>
+                <button id="btn-load-models" class="btn-secondary" type="button">Load models</button>
+                <button id="btn-test-connection" class="btn-primary" type="button">Test connection</button>
               </div>
+              <p id="ai-model-status" class="setting-status hidden" aria-live="polite"></p>
             </div>
 
-            <div id="category-list" class="category-list" aria-label="Categories"></div>
+            <div class="setting-card">
+              <h2 class="setting-card__title">Memory</h2>
+              <p id="ai-memory-summary" class="editor-hint">0 sites remembered · 0 categories</p>
+              <div class="editor-actions">
+                <button id="btn-clear-ai-memory" class="btn-delete-cat" type="button">Clear memory</button>
+                <button id="btn-recategorize-all" class="btn-secondary" type="button">Recategorize all next run</button>
+              </div>
+              <p class="editor-hint">
+                “Recategorize all next run” forgets every site assignment (keeping learned category
+                names) so the next Organise/Categorize run re-asks about every open tab.
+              </p>
+              <p id="ai-memory-status" class="setting-status hidden" aria-live="polite"></p>
+            </div>
 
-            <div class="preview-card">
-              <h2 class="preview-card__title">Test a URL or title</h2>
-              <p class="preview-card__sub">Paste a URL or title to see which category it would match.</p>
-              <div class="preview-inputs">
-                <input
-                  id="preview-url"
-                  class="editor-input"
-                  type="url"
-                  placeholder="https://example.com"
-                  autocomplete="off"
-                />
-                <input
-                  id="preview-title"
-                  class="editor-input"
-                  type="text"
-                  placeholder="Page title (optional)"
-                  autocomplete="off"
-                />
-                <button id="btn-preview" class="btn-primary" type="button">Test</button>
+            <div class="setting-card">
+              <h2 class="setting-card__title">Learned Categories</h2>
+              <p class="editor-hint">
+                Rename or recolour a category, or delete it — deleting unassigns those sites so the
+                next run re-asks about them.
+              </p>
+
+              <div id="category-editor" class="category-editor hidden" role="dialog" aria-label="Edit learned category" aria-modal="true">
+                <h2 id="editor-title" class="category-editor__title">Edit Category</h2>
+
+                <div class="editor-field">
+                  <label class="editor-label" for="editor-name">Name</label>
+                  <input
+                    id="editor-name"
+                    class="editor-input"
+                    type="text"
+                    placeholder="e.g. Finance"
+                    maxlength="40"
+                    autocomplete="off"
+                  />
+                </div>
+
+                <div class="editor-field">
+                  <span class="editor-label">Colour</span>
+                  <div id="colour-picker" class="colour-picker" role="radiogroup" aria-label="Category colour"></div>
+                </div>
+
+                <div class="editor-actions">
+                  <button id="btn-save-category" class="btn-primary" type="button">Save</button>
+                  <button id="btn-cancel-editor" class="btn-secondary" type="button">Cancel</button>
+                </div>
               </div>
-              <div id="preview-result" class="preview-result hidden" aria-live="polite">
-                Matches:
-                <span id="preview-dot" class="preview-dot"></span>
-                <strong id="preview-match"></strong>
-              </div>
+
+              <div id="category-list" class="category-list" aria-label="Learned categories"></div>
             </div>
           </section>
 

@@ -1,11 +1,11 @@
 import {
-  categorizeTabsWithCategories,
   findDuplicateGroups,
   isClosableTab,
   isInternalUrl,
   planDuplicateTabRemoval,
   escapeHtml,
 } from './lib/utils.js';
+import { groupTabsByAiMemory } from './lib/categorize-ai.js';
 import {
   getUndoTabs,
   getSettings,
@@ -15,7 +15,7 @@ import {
   setBoards,
   getSavedTabs,
   setSavedTabs,
-  getCategories,
+  getAiMemory,
   saveTabToBoard,
 } from './lib/storage.js';
 
@@ -25,7 +25,6 @@ let allTabs = [];
 let duplicateGroups = [];
 let lastClosedTabs = [];
 let confirmationThreshold = 5;
-let userCategories = [];
 let closePinnedDuplicates = false;
 
 /** Currently open sub-panel id, or null. */
@@ -55,10 +54,12 @@ const panelDuplicates   = document.getElementById('panel-duplicates');
 const panelPresets      = document.getElementById('panel-presets');
 const panelShortcuts    = document.getElementById('panel-shortcuts');
 
-const categoryRowsEl    = document.getElementById('category-rows');
-const duplicateDetailEl = document.getElementById('duplicate-detail');
-const presetRowsEl      = document.getElementById('preset-rows');
-const shortcutRowsEl    = document.getElementById('shortcut-rows');
+const categoryRowsEl     = document.getElementById('category-rows');
+const btnCategoriseNew   = document.getElementById('btn-categorise-new');
+const btnRecategoriseAll = document.getElementById('btn-recategorise-all');
+const duplicateDetailEl  = document.getElementById('duplicate-detail');
+const presetRowsEl       = document.getElementById('preset-rows');
+const shortcutRowsEl     = document.getElementById('shortcut-rows');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,10 +137,7 @@ async function refreshTabs() {
   const settings = await getSettings();
   confirmationThreshold = settings.confirmationThreshold;
 
-  [allTabs, userCategories] = await Promise.all([
-    chrome.tabs.query({}),
-    getCategories(),
-  ]);
+  allTabs = await chrome.tabs.query({});
 
   const {
     enabled: dedupeEnabled = true,
@@ -179,6 +177,60 @@ async function refreshTabs() {
 
 // ─── 1. Organise Tabs ─────────────────────────────────────────────────────────
 
+const FALLBACK_GROUP_COLOURS = ['blue', 'cyan', 'green', 'yellow', 'orange', 'pink', 'purple', 'grey'];
+
+function setOrganiseSub(text) {
+  const sub = btnOrganise.querySelector('.tile__sub');
+  if (sub) sub.textContent = text;
+}
+
+async function handleCategorizeError(response) {
+  if (response?.code === 'no-key') {
+    window.alert('Add your OpenRouter API key to let TabMate categorise tabs.');
+    chrome.runtime.openOptionsPage();
+    return true;
+  }
+  return false;
+}
+
+/** Groups every groupable tab using saved AI assignments and memory colours. */
+async function groupTabsFromMemory() {
+  const [tabs, memory] = await Promise.all([
+    chrome.tabs.query({ currentWindow: true }),
+    getAiMemory(),
+  ]);
+  const groups = groupTabsByAiMemory(tabs, memory);
+  const colourMap = new Map(memory.categories.map((category) => [category.name, category.colour]));
+  let colourIdx = 0;
+
+  for (const [name, catTabs] of groups) {
+    if (catTabs.length === 0) continue;
+
+    // Skip pinned tabs and internal browser pages — they cannot be grouped.
+    const groupableTabs = catTabs.filter(
+      (tab) => !tab.pinned && Number.isInteger(tab.id) && !isInternalUrl(tab.url),
+    );
+    if (groupableTabs.length === 0) continue;
+
+    const tabIds = groupableTabs.map((tab) => tab.id);
+    const colour = colourMap.get(name) ?? FALLBACK_GROUP_COLOURS[colourIdx % FALLBACK_GROUP_COLOURS.length];
+
+    try {
+      const groupId = await chrome.tabs.group({ tabIds });
+      await chrome.tabGroups.update(groupId, {
+        title: name,
+        color: colour,
+        collapsed: false,
+      });
+    } catch {
+      // Silently skip any individual group that fails (e.g. edge cases with
+      // tabs that cannot be grouped despite passing the filter above).
+    }
+
+    colourIdx++;
+  }
+}
+
 async function onOrganiseTabs() {
   if (!chrome.tabGroups) {
     window.alert(
@@ -188,56 +240,36 @@ async function onOrganiseTabs() {
     return;
   }
 
+  const originalSub = btnOrganise.querySelector('.tile__sub')?.textContent ?? '';
+  btnOrganise.disabled = true;
+  setOrganiseSub('Categorising…');
+
   try {
-    const tabs = await chrome.tabs.query({ currentWindow: true });
-
-    // Build a map from category name → { colour, tabIds }
-    const categories = categorizeTabsWithCategories(tabs, userCategories);
-    const colourMap = new Map(userCategories.map((c) => [c.name, c.colour]));
-    const fallbackColours = ['blue', 'cyan', 'green', 'yellow', 'orange', 'pink', 'purple', 'grey'];
-    let colourIdx = 0;
-
-    for (const [name, catTabs] of categories) {
-      if (catTabs.length === 0) continue;
-
-      // Skip pinned tabs and internal browser pages — they cannot be grouped.
-      const groupableTabs = catTabs.filter(
-        (t) => !t.pinned && Number.isInteger(t.id) && !isInternalUrl(t.url),
-      );
-      if (groupableTabs.length === 0) continue;
-
-      const tabIds = groupableTabs.map((t) => t.id);
-      const colour = colourMap.get(name) ?? fallbackColours[colourIdx % fallbackColours.length];
-
-      try {
-        const groupId = await chrome.tabs.group({ tabIds });
-        await chrome.tabGroups.update(groupId, {
-          title: name,
-          color: colour,
-          collapsed: false,
-        });
-      } catch {
-        // Silently skip any individual group that fails (e.g. edge cases with
-        // tabs that cannot be grouped despite passing the filter above).
-      }
-
-      colourIdx++;
+    const response = await sendRuntimeMessage({ type: 'categorize-tabs', mode: 'incremental' });
+    if (!response?.ok) {
+      if (await handleCategorizeError(response)) return;
+      throw new Error(response?.error || 'Unable to categorise tabs.');
     }
 
+    await groupTabsFromMemory();
     await refreshTabs();
   } catch (error) {
     showActionError(error, 'Unable to organise tabs into groups.');
+  } finally {
+    btnOrganise.disabled = false;
+    setOrganiseSub(originalSub);
   }
 }
 
 // ─── 2. Close by Category ─────────────────────────────────────────────────────
 
-function renderCategoryRows() {
-  const categories = categorizeTabsWithCategories(allTabs, userCategories);
+async function renderCategoryRows() {
+  const memory = await getAiMemory();
+  const groups = groupTabsByAiMemory(allTabs, memory);
   categoryRowsEl.innerHTML = '';
   let anyVisible = false;
 
-  categories.forEach((tabs, categoryName) => {
+  groups.forEach((tabs, categoryName) => {
     if (tabs.length === 0) return;
     anyVisible = true;
 
@@ -260,6 +292,24 @@ function renderCategoryRows() {
 
   if (!anyVisible) {
     categoryRowsEl.innerHTML = '<p class="panel-empty">No categorised tabs found.</p>';
+  }
+}
+
+async function runPanelCategorize(mode) {
+  const button = mode === 'all' ? btnRecategoriseAll : btnCategoriseNew;
+  if (button) button.disabled = true;
+
+  try {
+    const response = await sendRuntimeMessage({ type: 'categorize-tabs', mode });
+    if (!response?.ok) {
+      if (await handleCategorizeError(response)) return;
+      throw new Error(response?.error || 'Unable to categorise tabs.');
+    }
+    await refreshTabs();
+  } catch (error) {
+    showActionError(error, 'Unable to categorise tabs.');
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -679,6 +729,9 @@ async function init() {
     btnCloseCat.addEventListener('click', () =>
       openPanel('panel-categories', 'btn-close-cat', renderCategoryRows),
     );
+
+    if (btnCategoriseNew) btnCategoriseNew.addEventListener('click', () => runPanelCategorize('incremental'));
+    if (btnRecategoriseAll) btnRecategoriseAll.addEventListener('click', () => runPanelCategorize('all'));
 
     btnDuplicates.addEventListener('click', () =>
       openPanel('panel-duplicates', 'btn-duplicates', renderDuplicateDetail),

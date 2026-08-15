@@ -1,4 +1,7 @@
-import { initDefaults, getUndoTabs, setUndoTabs, clearUndoTabs, getSettings, setSettings, getBoards, getPresets, getSavedTabs, setSavedTabs, saveTabToBoard } from './lib/storage.js';
+import { initDefaults, getUndoTabs, setUndoTabs, clearUndoTabs, getSettings, setSettings, getBoards, getPresets, getSavedTabs, setSavedTabs, saveTabToBoard, getAiConfig, setAiConfig, getAiMemory, setAiMemory, resetAiMemory } from './lib/storage.js';
+import { groupTabsByAiMemory, splitTabsForCategorize, mergeCategorizeResult, buildCategorizePayload } from './lib/categorize-ai.js';
+import { categorizeWithOpenRouter, testOpenRouterConnection, listOpenRouterModels } from './lib/openrouter.js';
+import { isInternalUrl } from './lib/utils.js';
 
 // ─── Content-script messaging helpers ────────────────────────────────────────
 
@@ -252,13 +255,163 @@ async function handleTogglePopups() {
   return { ok: true, enabled: next };
 }
 
+// ─── AI tab categorisation ────────────────────────────────────────────────────
+
+/** In-flight categorize promise, guards against concurrent runs. */
+let inflightCategorize = null;
+
+function serializeGrouped(grouped) {
+  const out = {};
+  for (const [name, tabs] of grouped) out[name] = tabs;
+  return out;
+}
+
+async function recordRun(config, error = '') {
+  await setAiConfig({ ...config, lastError: error, lastRunAt: Date.now() });
+}
+
+/**
+ * Ensures every open tab has an AI category assignment.
+ *
+ * mode 'incremental' sends only unknown tabs (plus the existing category
+ * vocabulary); mode 'all' wipes assignments + categories first so the model can
+ * reinvent names, then resends every open tab.
+ *
+ * @param {{ mode: 'incremental' | 'all' }} [options]
+ * @returns {Promise<{ ok: boolean, grouped?: Map<string, chrome.tabs.Tab[]>, uncategorizedCount?: number, code?: string, error?: string }>}
+ */
+async function ensureCategorized({ mode = 'incremental' } = {}) {
+  const config = await getAiConfig();
+  if (!config.apiKey) {
+    return { ok: false, code: 'no-key', error: 'Add an OpenRouter API key in TabMate settings.' };
+  }
+
+  let tabs = await chrome.tabs.query({});
+  let memory = await getAiMemory();
+
+  if (mode === 'all') {
+    await resetAiMemory();
+    memory = { categories: [], assignments: {} };
+  }
+
+  const { unknown } = splitTabsForCategorize(tabs, memory);
+  const uncategorizedCount = unknown.length;
+
+  if (unknown.length === 0) {
+    return { ok: true, grouped: groupTabsByAiMemory(tabs, memory), uncategorizedCount: 0 };
+  }
+
+  const tabEntries = unknown.map((tab) => ({ id: `t${tab.id}`, tab }));
+  const result = await categorizeWithOpenRouter(config, buildCategorizePayload(tabEntries, memory.categories));
+
+  if (!result.ok) {
+    await recordRun(config, result.error);
+    return { ok: false, code: result.code ?? 'openrouter-error', error: result.error, uncategorizedCount };
+  }
+
+  const nextMemory = mergeCategorizeResult(memory, result.data, tabEntries);
+  await setAiMemory(nextMemory);
+  await recordRun(config);
+
+  return {
+    ok: true,
+    grouped: groupTabsByAiMemory(tabs, nextMemory),
+    uncategorizedCount,
+  };
+}
+
+async function runCategorize(mode) {
+  if (inflightCategorize) return inflightCategorize;
+  inflightCategorize = ensureCategorized({ mode }).finally(() => {
+    inflightCategorize = null;
+  });
+
+  const result = await inflightCategorize;
+  if (!result.ok) {
+    return { ok: false, code: result.code, error: result.error, uncategorizedCount: result.uncategorizedCount ?? 0 };
+  }
+  return {
+    ok: true,
+    grouped: serializeGrouped(result.grouped),
+    uncategorizedCount: result.uncategorizedCount ?? 0,
+  };
+}
+
+async function handleTestOpenRouter() {
+  const config = await getAiConfig();
+  if (!config.apiKey) return { ok: false, code: 'no-key', error: 'Add an OpenRouter API key first.' };
+
+  const result = await testOpenRouterConnection(config);
+  if (!result.ok) {
+    await recordRun(config, result.error);
+    return { ok: false, code: result.code ?? 'openrouter-error', error: result.error };
+  }
+  await recordRun(config);
+  return { ok: true };
+}
+
+async function handleLoadOpenRouterModels() {
+  const config = await getAiConfig();
+  if (!config.apiKey) return { ok: false, code: 'no-key', error: 'Add an OpenRouter API key first.' };
+
+  const result = await listOpenRouterModels(config.apiKey);
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, models: result.models };
+}
+
+/**
+ * Organises tabs into Chrome groups using AI categories: runs an incremental
+ * categorize first, then groups every groupable tab with its category colour.
+ *
+ * @returns {Promise<{ ok: boolean, code?: string, error?: string }>}
+ */
+async function handleOrganiseTabs() {
+  const result = await ensureCategorized({ mode: 'incremental' });
+  if (!result.ok) {
+    return { ok: false, code: result.code, error: result.error };
+  }
+
+  const tabs = await chrome.tabs.query({});
+  const memory = await getAiMemory();
+  const grouped = groupTabsByAiMemory(tabs, memory);
+
+  const colourMap = new Map(memory.categories.map((category) => [category.name, category.colour]));
+  const fallbackColours = ['blue', 'cyan', 'green', 'yellow', 'orange', 'pink', 'purple', 'grey'];
+  let colourIdx = 0;
+
+  for (const [name, catTabs] of grouped) {
+    if (catTabs.length === 0) continue;
+
+    const groupableTabs = catTabs.filter(
+      (tab) => !tab.pinned && Number.isInteger(tab.id) && !isInternalUrl(tab.url)
+    );
+    if (groupableTabs.length === 0) continue;
+
+    const tabIds = groupableTabs.map((tab) => tab.id);
+    const colour = colourMap.get(name) ?? fallbackColours[colourIdx % fallbackColours.length];
+
+    try {
+      const groupId = await chrome.tabs.group({ tabIds });
+      await chrome.tabGroups.update(groupId, {
+        title: name,
+        color: colour,
+        collapsed: false,
+      });
+    } catch {
+      // Silently skip any group that fails (e.g. tabs that cannot be grouped).
+    }
+    colourIdx++;
+  }
+
+  return { ok: true };
+}
+
 // ─── Extension command handler ────────────────────────────────────────────────
 
 chrome.commands.onCommand.addListener(async (command) => {
   try {
     if (command === 'organise-tabs') {
-      // Organise tabs into groups — open the popup or send a message to any open popup
-      await chrome.runtime.sendMessage({ type: 'command', command: 'organise-tabs' }).catch(() => {});
+      await handleOrganiseTabs();
     } else if (command === 'delete-duplicates') {
       await chrome.runtime.sendMessage({ type: 'command', command: 'delete-duplicates' }).catch(() => {});
     } else if (command === 'save-current-tab') {
@@ -302,6 +455,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     action = handleTogglePopups();
   } else if (message?.type === 'delete-duplicates') {
     action = handleDeleteDuplicates();
+  } else if (message?.type === 'categorize-tabs') {
+    action = runCategorize(message.mode === 'all' ? 'all' : 'incremental');
+  } else if (message?.type === 'test-openrouter') {
+    action = handleTestOpenRouter();
+  } else if (message?.type === 'load-openrouter-models') {
+    action = handleLoadOpenRouterModels();
   } else {
     action = Promise.resolve({ ok: false, error: 'Unknown message type.' });
   }
